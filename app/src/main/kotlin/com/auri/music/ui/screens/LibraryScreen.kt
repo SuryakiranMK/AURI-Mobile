@@ -191,8 +191,8 @@ fun LibraryScreen(
                     EngineStatusRow(
                         icon = Icons.Default.Storage,
                         iconTint = AuriCyanAccent,
-                        title = "Direct Stream Format",
-                        subtitle = "Opus 160 kbps (VISIONOS Client Token)"
+                        title = "Rust Audio Engine",
+                        subtitle = com.auri.music.data.AuriNativeEngine.getVersion()
                     )
                 }
             }

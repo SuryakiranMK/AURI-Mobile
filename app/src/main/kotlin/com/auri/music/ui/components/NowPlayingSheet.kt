@@ -246,7 +246,12 @@ fun NowPlayingSheet(
             }
 
             // Scrubber Slider
-            val progress = if (playbackState.durationMs > 0) {
+            var isDraggingSlider by remember { mutableStateOf(false) }
+            var sliderPosition by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+
+            val progress = if (isDraggingSlider) {
+                sliderPosition
+            } else if (playbackState.durationMs > 0) {
                 (playbackState.currentPositionMs.toFloat() / playbackState.durationMs.toFloat()).coerceIn(0f, 1f)
             } else 0f
 
@@ -254,7 +259,12 @@ fun NowPlayingSheet(
                 Slider(
                     value = progress,
                     onValueChange = { frac ->
-                        val target = (frac * playbackState.durationMs).toLong()
+                        isDraggingSlider = true
+                        sliderPosition = frac
+                    },
+                    onValueChangeFinished = {
+                        isDraggingSlider = false
+                        val target = (sliderPosition * playbackState.durationMs).toLong()
                         onSeekTo(target)
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -265,12 +275,18 @@ fun NowPlayingSheet(
                     )
                 )
 
+                val displayCurrentMs = if (isDraggingSlider) {
+                    (sliderPosition * playbackState.durationMs).toLong()
+                } else {
+                    playbackState.currentPositionMs
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = formatMs(playbackState.currentPositionMs),
+                        text = formatMs(displayCurrentMs),
                         color = AuriTextMuted,
                         fontSize = 12.sp
                     )

@@ -172,7 +172,7 @@ fun MainScreen(
                         onSongClick = { song, queue -> viewModel.playSong(song, queue) }
                     )
                     1 -> SearchScreen(
-                        onSearch = { query -> viewModel.search(query) },
+                        onSearch = { query -> viewModel.searchOnline(query) },
                         onSongClick = { song, queue -> viewModel.playSong(song, queue) }
                     )
                     2 -> LibraryScreen(

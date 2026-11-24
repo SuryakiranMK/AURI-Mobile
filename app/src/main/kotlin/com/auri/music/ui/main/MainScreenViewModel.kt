@@ -76,8 +76,16 @@ class MainScreenViewModel(
         return repository.search(query)
     }
 
+    suspend fun searchOnline(query: String): List<Song> {
+        return repository.searchOnline(query)
+    }
+
     fun getLyrics(songId: String): Lyrics {
         return repository.getLyrics(songId)
+    }
+
+    suspend fun getLyrics(song: Song): Lyrics {
+        return repository.getLyrics(song)
     }
 
     override fun onCleared() {

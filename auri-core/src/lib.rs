@@ -1,4 +1,5 @@
 pub mod dsp;
+pub mod jni;
 pub mod model;
 pub mod ytm;
 

@@ -98,22 +98,44 @@ class AuriPlayerController(
                 isPlaying = true,
                 currentPositionMs = 0L,
                 durationMs = song.durationMs,
-                loudnessGainDb = gain
+                loudnessGainDb = gain,
+                isBuffering = song.streamUrl.isEmpty()
             )
         }
 
-        exoPlayer?.let { player ->
-            try {
-                if (song.streamUrl.isNotEmpty()) {
-                    val mediaItem = MediaItem.fromUri(song.streamUrl)
-                    player.setMediaItem(mediaItem)
-                    player.prepare()
-                    player.play()
-                }
-            } catch (_: Exception) {}
-        }
+        scope.launch {
+            val resolvedSong = if (song.streamUrl.isEmpty()) {
+                repository.resolveStream(song)
+            } else {
+                song
+            }
 
-        startProgressTracker()
+            val resolvedGain = repository.calculateLoudnessGain(resolvedSong.loudnessDb)
+            val updatedQueue = queue.map { if (it.id == song.id) resolvedSong else it }
+
+            _playbackState.update {
+                it.copy(
+                    currentSong = resolvedSong,
+                    queue = updatedQueue,
+                    durationMs = resolvedSong.durationMs,
+                    loudnessGainDb = resolvedGain,
+                    isBuffering = false
+                )
+            }
+
+            exoPlayer?.let { player ->
+                try {
+                    if (resolvedSong.streamUrl.isNotEmpty()) {
+                        val mediaItem = MediaItem.fromUri(resolvedSong.streamUrl)
+                        player.setMediaItem(mediaItem)
+                        player.prepare()
+                        player.play()
+                    }
+                } catch (_: Exception) {}
+            }
+
+            startProgressTracker()
+        }
     }
 
     fun togglePlayPause() {

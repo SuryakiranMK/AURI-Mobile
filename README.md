@@ -67,15 +67,20 @@ AURI-Mobile/
 ```powershell
 cd auri-core
 cargo test
-cargo build --release
+
+# Cross-compile native JNI shared libraries for Android
+cargo build --target x86_64-linux-android --release
+cargo build --target aarch64-linux-android --release
 ```
 
 ### 2. Build & Run Android App
+The compiled native binaries `libauri_core.so` are placed in `app/src/main/jniLibs/{x86_64,arm64-v8a}/` and automatically linked via `System.loadLibrary("auri_core")` into `AuriNativeEngine`.
+
 ```powershell
 # Run unit test suite
 ./gradlew test
 
-# Build debug APK
+# Build debug APK with bundled native Rust engine
 ./gradlew assembleDebug
 
 # Install on connected device or emulator

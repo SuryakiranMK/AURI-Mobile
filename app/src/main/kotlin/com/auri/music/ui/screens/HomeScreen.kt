@@ -60,6 +60,14 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedCategory by remember { mutableStateOf(categories.firstOrNull() ?: "All") }
+    val displayedSongs = remember(selectedCategory, trending) {
+        when (selectedCategory) {
+            "Synthwave" -> trending.filter { it.title.contains("Echoes") || it.title.contains("Electric") }
+            "Cyber Chill" -> trending.filter { it.title.contains("Gravity") || it.title.contains("Rainfall") }
+            "Audiophile Master" -> trending.filter { it.title.contains("Odyssey") || it.title.contains("Prism") }
+            else -> trending
+        }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -212,10 +220,10 @@ fun HomeScreen(
         }
 
         // Trending Tracks List
-        items(trending) { song ->
+        items(displayedSongs) { song ->
             SongRowItem(
                 song = song,
-                onClick = { onSongClick(song, trending) },
+                onClick = { onSongClick(song, displayedSongs) },
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
             )
         }

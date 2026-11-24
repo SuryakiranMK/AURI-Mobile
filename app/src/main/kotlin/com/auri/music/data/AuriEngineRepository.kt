@@ -1,13 +1,14 @@
 package com.auri.music.data
 
-import com.auri.music.model.EqPreset
 import com.auri.music.model.Lyrics
 import com.auri.music.model.LyricsLine
 import com.auri.music.model.Song
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 
 interface AuriRepository {
     fun getQuickPicks(): List<Song>
@@ -15,10 +16,14 @@ interface AuriRepository {
     fun getMoodCategories(): List<String>
     fun getCategoryTracks(category: String): List<Song>
     fun search(query: String): List<Song>
+    suspend fun searchOnline(query: String): List<Song>
+    suspend fun resolveStream(song: Song): Song
+    suspend fun getLyrics(song: Song): Lyrics
     fun getLyrics(songId: String): Lyrics
     fun toggleLike(songId: String): Boolean
     fun getLikedSongs(): Flow<List<Song>>
     fun calculateLoudnessGain(loudnessDb: Double?): Double
+    fun getEngineVersion(): String
 }
 
 class DefaultAuriRepository : AuriRepository {
@@ -111,6 +116,10 @@ class DefaultAuriRepository : AuriRepository {
         )
     )
 
+    override fun getEngineVersion(): String {
+        return AuriNativeEngine.getVersion()
+    }
+
     override fun getQuickPicks(): List<Song> {
         val liked = likedSongIds.value
         return allSongs.take(4).map { it.copy(isLiked = liked.contains(it.id)) }
@@ -145,6 +154,53 @@ class DefaultAuriRepository : AuriRepository {
             it.artist.lowercase().contains(q) ||
             it.album.lowercase().contains(q)
         }.map { it.copy(isLiked = liked.contains(it.id)) }
+    }
+
+    override suspend fun searchOnline(query: String): List<Song> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isEmpty()) return@withContext emptyList()
+        val liked = likedSongIds.value
+
+        // Try native Rust Innertube search engine
+        val nativeResults = AuriNativeEngine.search(q)
+        if (nativeResults.isNotEmpty()) {
+            return@withContext nativeResults.map { it.copy(isLiked = liked.contains(it.id)) }
+        }
+
+        // Fallback to local catalog
+        search(q)
+    }
+
+    override suspend fun resolveStream(song: Song): Song = withContext(Dispatchers.IO) {
+        if (song.streamUrl.isNotEmpty()) return@withContext song
+
+        // Attempt stream resolution from YouTube Music via Rust Innertube client
+        val resolved = AuriNativeEngine.resolveStream(song.id)
+        if (resolved != null && resolved.url.isNotEmpty()) {
+            return@withContext song.copy(
+                streamUrl = resolved.url,
+                durationMs = if (resolved.durationMs > 0) resolved.durationMs else song.durationMs,
+                isOpus = resolved.isOpus,
+                audioQuality = resolved.audioQuality,
+                loudnessDb = resolved.loudnessDb ?: song.loudnessDb
+            )
+        }
+
+        // Fallback to demo audio asset if offline or stream unavailable
+        song.copy(streamUrl = allSongs.first().streamUrl)
+    }
+
+    override suspend fun getLyrics(song: Song): Lyrics = withContext(Dispatchers.IO) {
+        val nativeLyrics = AuriNativeEngine.getLyrics(
+            videoId = song.id,
+            title = song.title,
+            artist = song.artist,
+            durationSec = song.durationMs / 1000
+        )
+        if (nativeLyrics != null && (nativeLyrics.syncedLines.isNotEmpty() || nativeLyrics.plainText.isNotEmpty())) {
+            return@withContext nativeLyrics
+        }
+        getLyrics(song.id)
     }
 
     override fun getLyrics(songId: String): Lyrics {
@@ -197,13 +253,10 @@ class DefaultAuriRepository : AuriRepository {
     }
 
     /**
-     * Port of AURI's -14.0 LUFS broadcast normalizer formula:
-     * gain_db = (-raw).coerceIn(-24.0, 3.0)
+     * AURI's -14.0 LUFS broadcast normalizer:
+     * Delegates to native Rust DSP calculation.
      */
     override fun calculateLoudnessGain(loudnessDb: Double?): Double {
-        return when {
-            loudnessDb != null && loudnessDb.isFinite() -> (-loudnessDb).coerceIn(-24.0, 3.0)
-            else -> -4.5
-        }
+        return AuriNativeEngine.calculateLoudnessGain(loudnessDb)
     }
 }

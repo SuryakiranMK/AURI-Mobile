@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -21,12 +20,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,16 +48,31 @@ import com.auri.music.ui.theme.AuriTextPrimary
 import com.auri.music.ui.theme.AuriTextSecondary
 import com.auri.music.ui.theme.AuriVioletBright
 import com.auri.music.ui.theme.AuriVioletElectric
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SearchScreen(
-    onSearch: (String) -> List<Song>,
+    onSearch: suspend (String) -> List<Song>,
     onSongClick: (Song, List<Song>) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
-    val searchResults = remember(query) {
-        if (query.isNotBlank()) onSearch(query) else emptyList()
+    var searchResults by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+
+    LaunchedEffect(query) {
+        val q = query.trim()
+        if (q.isNotEmpty()) {
+            isSearching = true
+            searchResults = withContext(Dispatchers.IO) {
+                onSearch(q)
+            }
+            isSearching = false
+        } else {
+            searchResults = emptyList()
+            isSearching = false
+        }
     }
 
     Column(
@@ -103,25 +119,45 @@ fun SearchScreen(
                         Icon(
                             imageVector = Icons.Default.Clear,
                             contentDescription = "Clear",
-                            tint = AuriTextSecondary
+                            tint = AuriTextMuted
                         )
                     }
                 }
             },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AuriVioletElectric,
+                focusedBorderColor = AuriVioletBright,
                 unfocusedBorderColor = AuriGlassBorder,
                 focusedTextColor = AuriTextPrimary,
                 unfocusedTextColor = AuriTextPrimary,
-                cursorColor = AuriVioletBright
+                cursorColor = AuriVioletElectric
             ),
             shape = RoundedCornerShape(16.dp)
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        if (query.isBlank()) {
+        if (isSearching) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        color = AuriVioletBright,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Searching AURI Rust Core & Innertube...",
+                        color = AuriTextSecondary,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        } else if (query.isBlank()) {
             // Empty Search State
             Box(
                 modifier = Modifier
