@@ -1,5 +1,6 @@
 package com.auri.music.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -58,8 +59,14 @@ fun MainScreen(
 ) {
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val likedSongs by viewModel.likedSongs.collectAsStateWithLifecycle()
+    val currentLyrics by viewModel.currentLyrics.collectAsStateWithLifecycle()
+    val isLyricsLoading by viewModel.isLyricsLoading.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }
     var isNowPlayingExpanded by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isNowPlayingExpanded) {
+        isNowPlayingExpanded = false
+    }
 
     Box(
         modifier = modifier
@@ -190,10 +197,10 @@ fun MainScreen(
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it })
         ) {
-            val song = playbackState.currentSong ?: return@AnimatedVisibility
             NowPlayingSheet(
                 playbackState = playbackState,
-                lyrics = viewModel.getLyrics(song.id),
+                lyrics = currentLyrics,
+                isLyricsLoading = isLyricsLoading,
                 onCollapse = { isNowPlayingExpanded = false },
                 onPlayPause = { viewModel.togglePlayPause() },
                 onNext = { viewModel.skipNext() },

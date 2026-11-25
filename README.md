@@ -16,20 +16,19 @@
   - Uses the same unthrottled VisionOS Innertube stream resolution pipeline from desktop AURI.
   - Fetches true high-fidelity audio streams (Opus itag 251 @ 160 kbps, AAC itag 140 @ 128/256 kbps) with zero ad interruptions.
   - Built-in LRCLIB & YouTube synchronized lyrics extraction.
-- **-14.0 LUFS Broadcast Loudness Normalization**:
-  - Real-time ITU-R BS.1770 loudness compensation matching YouTube Music desktop broadcast levels.
-  - Zero-allocation soft-knee peak limiter preventing digital clipping distortion.
-- **10-Band ISO Octave Graphic Equalizer**:
-  - Center frequencies: `31Hz, 63Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz`.
-  - Presets for Audiophile Flat, Deep Bass Punch, Vocal Clarity, and Cinematic Dynamic.
+- **-14.0 LUFS Broadcast Loudness Normalization & Hardware DSP**:
+  - Real-time ITU-R BS.1770 loudness compensation matching YouTube Music desktop broadcast levels via ExoPlayer attenuation & Android `LoudnessEnhancer`.
+  - Hardware `android.media.audiofx.Equalizer` integration mapping the 10-band ISO octave curve (`31Hz–16kHz`) with presets for Audiophile Flat, Deep Bass Punch, Vocal Clarity, and Cinematic Dynamic.
+- **Background Media Playback (`MediaSessionService`)**:
+  - Dedicated foreground `AuriPlaybackService` with lockscreen and notification controls, artwork metadata, and audio-becoming-noisy pause protection.
 - **Modern Jetpack Compose UI**:
-  - Pure obsidian theme (`#08080B`) with neon electric violet accents (`#8B5CF6`).
-  - **Home Screen**: Dynamic Quick Picks carousel, trending tracks, and mood genre filters.
+  - Pure obsidian theme (`#08080B`) with electric violet accents (`#8B5CF6`) and official AURI branding & adaptive launcher icon.
+  - **Home Screen**: Dynamic Quick Picks carousel, trending tracks, mood genre filters, and cached album art loading via Coil.
   - **Search**: Instant debounced query parsing with rich track results.
   - **Docked MiniPlayer**: Persistent bottom bar with progress scrub and quick transport controls.
   - **Now Playing HUD**: Full-screen immersive player with hero album art, time scrubber, shuffle, repeat, like, and audio quality tags.
-  - **Synchronized Lyrics Drawer**: Auto-scrolling lyrics with electric violet active glow.
-  - **Library**: Saved/liked tracks with instant playback and live engine status.
+  - **Synchronized Lyrics Drawer**: Auto-scrolling synced & plain-text lyrics with electric violet active glow.
+  - **Library**: Persistent Liked/Saved tracks with instant playback and live Rust engine status.
 
 ---
 
@@ -80,14 +79,14 @@ The compiled native binaries `libauri_core.so` are placed in `app/src/main/jniLi
 # Run unit test suite
 ./gradlew test
 
-# Build debug APK with bundled native Rust engine
-./gradlew assembleDebug
+# Build release APK with bundled native Rust engine
+./gradlew assembleRelease
 
 # Install on connected device or emulator
-./gradlew installDebug
+./gradlew installRelease
 ```
 
-The compiled APK will be located at `app/build/outputs/apk/debug/app-debug.apk`.
+Compiled APKs are located at `app/build/outputs/apk/release/app-release.apk` (and `debug/app-debug.apk`).
 
 ---
 

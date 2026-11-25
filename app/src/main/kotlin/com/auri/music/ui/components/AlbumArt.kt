@@ -16,8 +16,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.auri.music.ui.theme.AuriGlassBorder
 import com.auri.music.ui.theme.AuriVioletBright
 import com.auri.music.ui.theme.AuriVioletElectric
@@ -32,6 +36,7 @@ fun AlbumArt(
     elevation: Dp = 4.dp
 ) {
     val shape = RoundedCornerShape(cornerRadius)
+    val context = LocalContext.current
 
     Box(
         modifier = modifier
@@ -49,7 +54,7 @@ fun AlbumArt(
             .border(1.dp, AuriGlassBorder, shape),
         contentAlignment = Alignment.Center
     ) {
-        // Gradient acoustic disc pattern
+        // Stylized placeholder shown while loading or when offline
         Box(
             modifier = Modifier
                 .fillMaxSize(0.7f)
@@ -65,6 +70,18 @@ fun AlbumArt(
                 contentDescription = contentDescription,
                 tint = AuriVioletElectric,
                 modifier = Modifier.size(cornerRadius * 2)
+            )
+        }
+
+        if (thumbnailUrl.isNotBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(thumbnailUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = contentDescription,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
         }
     }

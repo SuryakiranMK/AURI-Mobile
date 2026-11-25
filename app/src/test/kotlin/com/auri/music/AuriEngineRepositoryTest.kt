@@ -3,6 +3,9 @@ package com.auri.music
 import com.auri.music.data.DefaultAuriRepository
 import com.auri.music.model.EqPreset
 import com.auri.music.model.RepeatMode
+import com.auri.music.model.Song
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -75,11 +78,29 @@ class AuriEngineRepositoryTest {
     }
 
     @Test
-    fun testToggleLike_persists() {
-        val songId = "auri_chill_01"
-        val likedFirst = repository.toggleLike(songId)
-        val likedSecond = repository.toggleLike(songId)
-        assertFalse(likedFirst == likedSecond)
+    fun testToggleLike_persistsAndUpdatesLikedSongsFlow() = runTest {
+        val onlineSong = Song(
+            id = "yt_test_123",
+            title = "Blinding Lights",
+            artist = "The Weeknd",
+            duration = "3:20",
+            durationMs = 200000L,
+            thumbnailUrl = "https://example.com/art.jpg"
+        )
+        repository.registerSong(onlineSong)
+        val likedFirst = repository.toggleLike(onlineSong.id)
+        assertTrue(likedFirst)
+        assertTrue(repository.getLikedSongs().first().any { it.id == onlineSong.id })
+
+        val likedSecond = repository.toggleLike(onlineSong.id)
+        assertFalse(likedSecond)
+        assertFalse(repository.getLikedSongs().first().any { it.id == onlineSong.id })
+    }
+
+    @Test
+    fun testMoodCategories_excludesGamingModes() {
+        val categories = repository.getMoodCategories()
+        assertFalse(categories.any { it.contains("Gaming", ignoreCase = true) })
     }
 
     @Test

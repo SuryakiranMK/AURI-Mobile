@@ -1,10 +1,13 @@
 package com.auri.music.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +16,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,6 +79,7 @@ import com.auri.music.ui.theme.AuriVioletGlow
 fun NowPlayingSheet(
     playbackState: PlaybackState,
     lyrics: Lyrics,
+    isLyricsLoading: Boolean = false,
     onCollapse: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
@@ -90,9 +96,19 @@ fun NowPlayingSheet(
     var showEqualizer by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
 
+    BackHandler(enabled = showEqualizer || showLyrics) {
+        if (showLyrics) showLyrics = false
+        else if (showEqualizer) showEqualizer = false
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {}
+            )
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
@@ -106,7 +122,9 @@ fun NowPlayingSheet(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -114,7 +132,7 @@ fun NowPlayingSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp),
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -430,6 +448,7 @@ fun NowPlayingSheet(
             LyricsView(
                 lyrics = lyrics,
                 currentPositionMs = playbackState.currentPositionMs,
+                isLoading = isLyricsLoading,
                 onSeekTo = onSeekTo,
                 onDismiss = { showLyrics = false }
             )
