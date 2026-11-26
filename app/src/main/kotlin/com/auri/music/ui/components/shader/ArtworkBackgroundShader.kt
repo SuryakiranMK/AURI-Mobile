@@ -38,9 +38,9 @@ import kotlinx.coroutines.withContext
 private const val AURI_AMBIENT_AGSL = """
 uniform float2 iResolution;
 uniform float iTime;
-uniform half4 uColorPrimary;
-uniform half4 uColorSecondary;
-uniform half4 uColorBase;
+uniform float4 uColorPrimary;
+uniform float4 uColorSecondary;
+uniform float4 uColorBase;
 
 half4 main(float2 fragCoord) {
     float2 uv = fragCoord / max(iResolution, float2(1.0));
@@ -48,11 +48,11 @@ half4 main(float2 fragCoord) {
     float2 c2 = float2(0.70 + 0.16 * cos(iTime * 0.25), 0.56 + 0.18 * sin(iTime * 0.31));
     float d1 = smoothstep(0.95, 0.0, length(uv - c1));
     float d2 = smoothstep(0.90, 0.0, length(uv - c2));
-    half4 col = uColorBase;
-    col = mix(col, uColorPrimary, d1 * 0.48);
-    col = mix(col, uColorSecondary, d2 * 0.34);
+    half4 col = half4(uColorBase);
+    col = mix(col, half4(uColorPrimary), half(d1 * 0.48));
+    col = mix(col, half4(uColorSecondary), half(d2 * 0.34));
     float bottomFade = smoothstep(0.45, 0.95, uv.y);
-    return mix(col, uColorBase, bottomFade * 0.85);
+    return mix(col, half4(uColorBase), half(bottomFade * 0.85));
 }
 """
 
@@ -111,24 +111,9 @@ fun ArtworkBackgroundShader(
         Canvas(modifier = modifier.fillMaxSize()) {
             shader.setFloatUniform("iResolution", size.width, size.height)
             shader.setFloatUniform("iTime", timeSec)
-            shader.setColorUniform("uColorPrimary", android.graphics.Color.argb(
-                255,
-                (dominantColor.red * 255).toInt(),
-                (dominantColor.green * 255).toInt(),
-                (dominantColor.blue * 255).toInt()
-            ))
-            shader.setColorUniform("uColorSecondary", android.graphics.Color.argb(
-                255,
-                (secondaryColor.red * 255).toInt(),
-                (secondaryColor.green * 255).toInt(),
-                (secondaryColor.blue * 255).toInt()
-            ))
-            shader.setColorUniform("uColorBase", android.graphics.Color.argb(
-                255,
-                (AuriObsidianBackground.red * 255).toInt(),
-                (AuriObsidianBackground.green * 255).toInt(),
-                (AuriObsidianBackground.blue * 255).toInt()
-            ))
+            shader.setFloatUniform("uColorPrimary", dominantColor.red, dominantColor.green, dominantColor.blue, 1f)
+            shader.setFloatUniform("uColorSecondary", secondaryColor.red, secondaryColor.green, secondaryColor.blue, 1f)
+            shader.setFloatUniform("uColorBase", AuriObsidianBackground.red, AuriObsidianBackground.green, AuriObsidianBackground.blue, 1f)
             drawRect(brush = ShaderBrush(shader))
         }
     } else {

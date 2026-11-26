@@ -12,8 +12,8 @@ android {
     applicationId = "com.auri.music"
     minSdk = 24
     targetSdk = 37
-    versionCode = 5
-    versionName = "2.0.0"
+    versionCode = 6
+    versionName = "2.0.1"
   }
 
   buildTypes {
