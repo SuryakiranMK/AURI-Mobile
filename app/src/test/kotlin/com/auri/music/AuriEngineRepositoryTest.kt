@@ -1,7 +1,9 @@
 package com.auri.music
 
 import com.auri.music.data.DefaultAuriRepository
+import com.auri.music.data.lyrics.LyricsWaterfallRepository
 import com.auri.music.model.EqPreset
+import com.auri.music.model.LyricSyncType
 import com.auri.music.model.RepeatMode
 import com.auri.music.model.Song
 import kotlinx.coroutines.flow.first
@@ -101,6 +103,30 @@ class AuriEngineRepositoryTest {
     fun testMoodCategories_excludesGamingModes() {
         val categories = repository.getMoodCategories()
         assertFalse(categories.any { it.contains("Gaming", ignoreCase = true) })
+    }
+
+    @Test
+    fun testLyricsParsers_lrcAndTtmlWordSync() {
+        val waterfall = LyricsWaterfallRepository(null)
+        val lrc = waterfall.parseLrc("[00:12.50]Hello world\n[00:25.00]Second line", "LRCLIB")
+        assertNotNull(lrc)
+        assertEquals(2, lrc!!.syncedLines.size)
+        assertEquals(12500L, lrc.syncedLines[0].timestampMs)
+        assertEquals(LyricSyncType.LINE_SYNCED, lrc.syncType)
+
+        val ttml = """
+            <tt><body><div>
+              <p begin="00:05.000" end="00:08.000">
+                <span begin="00:05.000" end="00:06.200">Blinded</span>
+                <span begin="00:06.200" end="00:08.000">by lights</span>
+              </p>
+            </div></body></tt>
+        """.trimIndent()
+        val rich = waterfall.parseTtmlLyrics(ttml, "BetterLyrics")
+        assertNotNull(rich)
+        assertEquals(LyricSyncType.RICH_SYNCED, rich!!.syncType)
+        assertEquals(2, rich.syncedLines[0].words.size)
+        assertEquals("Blinded", rich.syncedLines[0].words[0].text)
     }
 
     @Test

@@ -1,17 +1,26 @@
 package com.auri.music.data
 
 import android.content.Context
+import com.auri.music.data.cache.AuriCacheManager
+import com.auri.music.data.lyrics.LyricsWaterfallRepository
+import com.auri.music.db.AuriDatabase
+import com.auri.music.db.EventEntity
+import com.auri.music.db.FormatEntity
+import com.auri.music.db.RelatedSongMap
+import com.auri.music.db.SongEntity
 import com.auri.music.model.Lyrics
 import com.auri.music.model.LyricsLine
 import com.auri.music.model.Song
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 interface AuriRepository {
@@ -28,6 +37,13 @@ interface AuriRepository {
     fun isSongLiked(songId: String): Boolean
     fun toggleLike(songId: String): Boolean
     fun getLikedSongs(): Flow<List<Song>>
+    fun getCachedSongs(): Flow<List<Song>> = MutableStateFlow(emptyList())
+    fun getDownloadedSongs(): Flow<List<Song>> = MutableStateFlow(emptyList())
+    suspend fun getLocalQuickPicks(limit: Int = 10): List<Song> = getQuickPicks()
+    suspend fun getKeepListening(limit: Int = 10): List<Song> = emptyList()
+    suspend fun getForgottenFavorites(limit: Int = 10): List<Song> = emptyList()
+    suspend fun recordPlayEvent(song: Song, playTimeMs: Long) {}
+    suspend fun recordRelated(seedSongId: String, relatedSong: Song) {}
     fun calculateLoudnessGain(loudnessDb: Double?): Double
     fun getEngineVersion(): String
 }
@@ -36,7 +52,12 @@ class DefaultAuriRepository(
     context: Context? = null
 ) : AuriRepository {
 
-    private val prefs = context?.applicationContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val appContext = context?.applicationContext
+    private val dao = appContext?.let { AuriDatabase.getInstance(it).auriDao() }
+    private val preferences = appContext?.let { AuriPreferences(it) }
+    private val cacheManager = appContext?.let { AuriCacheManager.getInstance(it) }
+    private val lyricsWaterfall = LyricsWaterfallRepository(dao)
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val allSongs: List<Song> = listOf(
         Song(
@@ -129,17 +150,26 @@ class DefaultAuriRepository(
         allSongs.forEach { put(it.id, it) }
     }
     private val lyricsCache = ConcurrentHashMap<String, Lyrics>()
-    private val likedSongIds = MutableStateFlow(loadInitialLikedIds())
-    private val likedSongsFlow = MutableStateFlow<List<Song>>(emptyList())
+    private val likedSongIds = MutableStateFlow(setOf("auri_synth_01", "auri_chill_02"))
+    private val likedSongsMemoryFlow = MutableStateFlow<List<Song>>(emptyList())
 
     init {
-        loadSavedSongsMetadata()
-        refreshLikedSongsFlow()
+        refreshMemoryLikedSongs()
+        if (dao != null) {
+            repoScope.launch {
+                allSongs.forEach { song ->
+                    dao.insertSongIfAbsent(SongEntity.fromModel(song))
+                }
+                dao.getLikedSongs().collect { entities ->
+                    val ids = entities.map { it.id }.toSet()
+                    likedSongIds.value = ids
+                    entities.forEach { knownSongs[it.id] = it.toModel() }
+                }
+            }
+        }
     }
 
-    override fun getEngineVersion(): String {
-        return AuriNativeEngine.getVersion()
-    }
+    override fun getEngineVersion(): String = AuriNativeEngine.getVersion()
 
     override fun getQuickPicks(): List<Song> {
         val liked = likedSongIds.value
@@ -186,7 +216,7 @@ class DefaultAuriRepository(
         if (nativeResults.isNotEmpty()) {
             return@withContext nativeResults.map { song ->
                 val updated = song.copy(isLiked = liked.contains(song.id))
-                knownSongs[song.id] = updated
+                registerSong(updated)
                 updated
             }
         }
@@ -198,7 +228,8 @@ class DefaultAuriRepository(
         registerSong(song)
         if (song.streamUrl.isNotEmpty()) return@withContext song.copy(isLiked = isSongLiked(song.id))
 
-        val resolved = AuriNativeEngine.resolveStream(song.id)
+        val preferredLang = preferences?.settings?.value?.preferredAudioLanguage ?: ""
+        val resolved = AuriNativeEngine.resolveStream(song.id, preferredLang)
         if (resolved != null && resolved.url.isNotEmpty()) {
             val updated = song.copy(
                 streamUrl = resolved.url,
@@ -209,6 +240,28 @@ class DefaultAuriRepository(
                 isLiked = isSongLiked(song.id)
             )
             knownSongs[updated.id] = updated
+
+            cacheManager?.cacheResolvedUrl(
+                songId = song.id,
+                url = resolved.url,
+                itag = resolved.itag,
+                contentLength = resolved.contentLength,
+                expiresInSeconds = resolved.expiresInSeconds
+            )
+            dao?.upsertFormat(
+                FormatEntity(
+                    id = song.id,
+                    itag = resolved.itag,
+                    mimeType = resolved.mimeType,
+                    codecs = resolved.codecs,
+                    bitrate = resolved.bitrate,
+                    sampleRate = resolved.sampleRate,
+                    contentLength = resolved.contentLength,
+                    loudnessDb = resolved.loudnessDb,
+                    streamUrl = resolved.url,
+                    expiresAtMs = System.currentTimeMillis() + (resolved.expiresInSeconds.coerceAtLeast(60L) * 1000L)
+                )
+            )
             return@withContext updated
         }
 
@@ -224,22 +277,11 @@ class DefaultAuriRepository(
             return@withContext demo
         }
 
-        val nativeLyrics = AuriNativeEngine.getLyrics(
-            videoId = song.id,
-            title = song.title,
-            artist = song.artist,
-            durationSec = song.durationMs / 1000
-        )
-        if (nativeLyrics != null && (nativeLyrics.syncedLines.isNotEmpty() || nativeLyrics.plainText.isNotEmpty())) {
-            lyricsCache[song.id] = nativeLyrics
-            return@withContext nativeLyrics
+        val resolved = lyricsWaterfall.getLyrics(song)
+        if (resolved.syncedLines.isNotEmpty() || resolved.plainText.isNotEmpty()) {
+            lyricsCache[song.id] = resolved
         }
-
-        Lyrics(
-            syncedLines = emptyList(),
-            plainText = "",
-            source = "No lyrics found for \"${song.title}\""
-        )
+        resolved
     }
 
     override fun getLyrics(songId: String): Lyrics {
@@ -275,11 +317,14 @@ class DefaultAuriRepository(
         if (existing == null || (existing.streamUrl.isEmpty() && song.streamUrl.isNotEmpty())) {
             knownSongs[song.id] = song.copy(isLiked = likedSongIds.value.contains(song.id))
         }
+        if (dao != null) {
+            repoScope.launch {
+                dao.insertSongIfAbsent(SongEntity.fromModel(song.copy(isLiked = likedSongIds.value.contains(song.id))))
+            }
+        }
     }
 
-    override fun isSongLiked(songId: String): Boolean {
-        return likedSongIds.value.contains(songId)
-    }
+    override fun isSongLiked(songId: String): Boolean = likedSongIds.value.contains(songId)
 
     override fun toggleLike(songId: String): Boolean {
         var isNowLiked = false
@@ -293,89 +338,71 @@ class DefaultAuriRepository(
             }
         }
         knownSongs[songId]?.let { knownSongs[songId] = it.copy(isLiked = isNowLiked) }
-        refreshLikedSongsFlow()
-        persistLikedSongs()
+        refreshMemoryLikedSongs()
+        if (dao != null) {
+            repoScope.launch {
+                val song = knownSongs[songId]
+                if (song != null) {
+                    dao.insertSongIfAbsent(SongEntity.fromModel(song))
+                }
+                dao.setLiked(songId, isNowLiked, if (isNowLiked) System.currentTimeMillis() else null)
+            }
+        }
         return isNowLiked
     }
 
-    override fun getLikedSongs(): Flow<List<Song>> = likedSongsFlow.asStateFlow()
+    override fun getLikedSongs(): Flow<List<Song>> {
+        return dao?.getLikedSongs()?.map { list -> list.map { it.toModel() } }
+            ?: likedSongsMemoryFlow.asStateFlow()
+    }
+
+    override fun getCachedSongs(): Flow<List<Song>> {
+        return dao?.getCachedSongs()?.map { list -> list.map { it.toModel() } }
+            ?: MutableStateFlow(emptyList())
+    }
+
+    override fun getDownloadedSongs(): Flow<List<Song>> {
+        return dao?.getDownloadedSongs()?.map { list -> list.map { it.toModel() } }
+            ?: MutableStateFlow(emptyList())
+    }
+
+    override suspend fun getLocalQuickPicks(limit: Int): List<Song> = withContext(Dispatchers.IO) {
+        val local = dao?.getQuickPicks(limit)?.map { it.toModel() }.orEmpty()
+        if (local.size >= 3) local else getQuickPicks()
+    }
+
+    override suspend fun getKeepListening(limit: Int): List<Song> = withContext(Dispatchers.IO) {
+        dao?.getKeepListening(limit)?.map { it.toModel() }.orEmpty()
+    }
+
+    override suspend fun getForgottenFavorites(limit: Int): List<Song> = withContext(Dispatchers.IO) {
+        val fourteenDaysAgo = System.currentTimeMillis() - (14L * 24L * 60L * 60L * 1000L)
+        dao?.getForgottenFavorites(fourteenDaysAgo, limit)?.map { it.toModel() }.orEmpty()
+    }
+
+    override suspend fun recordPlayEvent(song: Song, playTimeMs: Long) = withContext(Dispatchers.IO) {
+        if (playTimeMs < 30_000L) return@withContext
+        if (preferences?.settings?.value?.pauseListenHistory == true) return@withContext
+        val d = dao ?: return@withContext
+        d.insertSongIfAbsent(SongEntity.fromModel(song))
+        d.insertEvent(EventEntity(songId = song.id, timestampMs = System.currentTimeMillis(), playTimeMs = playTimeMs))
+        d.addPlayTime(song.id, playTimeMs)
+    }
+
+    override suspend fun recordRelated(seedSongId: String, relatedSong: Song) = withContext(Dispatchers.IO) {
+        val d = dao ?: return@withContext
+        d.insertSongIfAbsent(SongEntity.fromModel(relatedSong))
+        d.insertRelated(RelatedSongMap(songId = seedSongId, relatedSongId = relatedSong.id))
+    }
 
     override fun calculateLoudnessGain(loudnessDb: Double?): Double {
         return AuriNativeEngine.calculateLoudnessGain(loudnessDb)
     }
 
-    private fun refreshLikedSongsFlow() {
+    private fun refreshMemoryLikedSongs() {
         val likedIds = likedSongIds.value
-        val result = likedIds.mapNotNull { id ->
+        likedSongsMemoryFlow.value = likedIds.mapNotNull { id ->
             knownSongs[id]?.copy(isLiked = true)
         }
-        likedSongsFlow.value = result
-    }
-
-    private fun loadInitialLikedIds(): Set<String> {
-        val stored = prefs?.getStringSet(KEY_LIKED_IDS, null)
-        return stored?.toSet() ?: setOf("auri_synth_01", "auri_chill_02")
-    }
-
-    private fun loadSavedSongsMetadata() {
-        val raw = prefs?.getString(KEY_LIKED_METADATA, null) ?: return
-        try {
-            val arr = JSONArray(raw)
-            for (i in 0 until arr.length()) {
-                val obj = arr.getJSONObject(i)
-                val id = obj.optString("id", "")
-                if (id.isNotEmpty() && !knownSongs.containsKey(id)) {
-                    knownSongs[id] = Song(
-                        id = id,
-                        title = obj.optString("title", "Unknown Track"),
-                        artist = obj.optString("artist", "Unknown Artist"),
-                        album = obj.optString("album", ""),
-                        duration = obj.optString("duration", "3:30"),
-                        durationMs = obj.optLong("durationMs", 210000L),
-                        thumbnailUrl = obj.optString("thumbnailUrl", ""),
-                        streamUrl = "",
-                        isOpus = obj.optBoolean("isOpus", true),
-                        audioQuality = obj.optString("audioQuality", "OPUS 160 kbps • 48 kHz"),
-                        loudnessDb = if (obj.has("loudnessDb") && !obj.isNull("loudnessDb")) obj.getDouble("loudnessDb") else null,
-                        isLiked = true
-                    )
-                }
-            }
-        } catch (_: Throwable) {}
-    }
-
-    private fun persistLikedSongs() {
-        val p = prefs ?: return
-        try {
-            val likedIds = likedSongIds.value
-            val arr = JSONArray()
-            for (id in likedIds) {
-                val s = knownSongs[id] ?: continue
-                arr.put(
-                    JSONObject().apply {
-                        put("id", s.id)
-                        put("title", s.title)
-                        put("artist", s.artist)
-                        put("album", s.album)
-                        put("duration", s.duration)
-                        put("durationMs", s.durationMs)
-                        put("thumbnailUrl", s.thumbnailUrl)
-                        put("isOpus", s.isOpus)
-                        put("audioQuality", s.audioQuality)
-                        if (s.loudnessDb != null) put("loudnessDb", s.loudnessDb)
-                    }
-                )
-            }
-            p.edit()
-                .putStringSet(KEY_LIKED_IDS, likedIds)
-                .putString(KEY_LIKED_METADATA, arr.toString())
-                .apply()
-        } catch (_: Throwable) {}
-    }
-
-    companion object {
-        private const val PREFS_NAME = "auri_library_prefs"
-        private const val KEY_LIKED_IDS = "liked_song_ids"
-        private const val KEY_LIKED_METADATA = "liked_songs_metadata"
     }
 }
