@@ -6,6 +6,8 @@ import com.auri.music.model.EqPreset
 import com.auri.music.model.LyricSyncType
 import com.auri.music.model.RepeatMode
 import com.auri.music.model.Song
+import com.auri.music.player.AudioOffloadEligibility
+import com.auri.music.player.CrossfadeManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -127,6 +129,30 @@ class AuriEngineRepositoryTest {
         assertEquals(LyricSyncType.RICH_SYNCED, rich!!.syncType)
         assertEquals(2, rich.syncedLines[0].words.size)
         assertEquals("Blinded", rich.syncedLines[0].words[0].text)
+    }
+
+    @Test
+    fun testAudioOffloadEligibility_andCrossfadeGuard() {
+        val eligible = AudioOffloadEligibility(
+            eqPreset = EqPreset.FLAT,
+            normalizerEnabled = false,
+            crossfadeActive = false
+        )
+        assertTrue(eligible.isEligible)
+
+        val ineligibleEq = AudioOffloadEligibility(
+            eqPreset = EqPreset.BASS_PUNCH,
+            normalizerEnabled = false
+        )
+        assertFalse(ineligibleEq.isEligible)
+
+        val s1 = Song("1", "Track 1", "Artist", "Same Album", "3:00", 180000L, "")
+        val s2 = Song("2", "Track 2", "Artist", "Same Album", "3:00", 180000L, "")
+        val s3 = Song("3", "Track 3", "Artist", "Other Album", "3:00", 180000L, "")
+        assertFalse(CrossfadeManager.shouldCrossfade(true, s1, s2, RepeatMode.OFF))
+        assertTrue(CrossfadeManager.shouldCrossfade(true, s1, s3, RepeatMode.OFF))
+        assertEquals(0f, CrossfadeManager.quinticCurve(0f), 0.001f)
+        assertEquals(1f, CrossfadeManager.quinticCurve(1f), 0.001f)
     }
 
     @Test

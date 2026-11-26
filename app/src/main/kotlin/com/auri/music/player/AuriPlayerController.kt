@@ -3,23 +3,28 @@ package com.auri.music.player
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.media.audiofx.Equalizer
-import android.media.audiofx.LoudnessEnhancer
+import android.media.AudioDeviceInfo
 import android.net.Uri
-import android.util.Log
+import android.os.Build
+import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
-import com.google.common.util.concurrent.ListenableFuture
+import com.auri.music.AuriApplication
 import com.auri.music.data.AuriRepository
+import com.auri.music.data.cache.NextTrackPreloadTrigger
+import com.auri.music.data.sponsorblock.SponsorSegment
 import com.auri.music.model.EqPreset
 import com.auri.music.model.PlaybackState
 import com.auri.music.model.RepeatMode
 import com.auri.music.model.Song
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,8 +35,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.pow
 
+@OptIn(UnstableApi::class)
 class AuriPlayerController(
     private val context: Context,
     private val repository: AuriRepository,
@@ -39,11 +44,17 @@ class AuriPlayerController(
 ) {
     private var exoPlayer: ExoPlayer? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
-    private var mediaController: MediaController? = null
     private var progressJob: Job? = null
     private var playResolutionJob: Job? = null
-    private var hardwareEqualizer: Equalizer? = null
-    private var loudnessEnhancer: LoudnessEnhancer? = null
+    private var btMonitor: BluetoothA2dpMonitor? = null
+    private var preloadTrigger: NextTrackPreloadTrigger? = null
+
+    private var activeSegments: List<SponsorSegment> = emptyList()
+    private var lastSkippedEndMs: Long = -1L
+    private var accumulatedPlayMs: Long = 0L
+    private var lastReportedSongId: String? = null
+    private var lastStallCheckPos: Long = -1L
+    private var stallTicks: Int = 0
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
@@ -51,9 +62,7 @@ class AuriPlayerController(
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackStateInt: Int) {
             when (playbackStateInt) {
-                Player.STATE_BUFFERING -> {
-                    _playbackState.update { it.copy(isBuffering = true) }
-                }
+                Player.STATE_BUFFERING -> _playbackState.update { it.copy(isBuffering = true) }
                 Player.STATE_READY -> {
                     _playbackState.update {
                         it.copy(
@@ -61,14 +70,10 @@ class AuriPlayerController(
                             durationMs = exoPlayer?.duration?.coerceAtLeast(0L) ?: it.durationMs
                         )
                     }
-                    applyDspEffects()
+                    applyDspAndOffload()
                 }
-                Player.STATE_ENDED -> {
-                    onTrackEnded()
-                }
-                Player.STATE_IDLE -> {
-                    _playbackState.update { it.copy(isBuffering = false) }
-                }
+                Player.STATE_ENDED -> onTrackEnded()
+                Player.STATE_IDLE -> _playbackState.update { it.copy(isBuffering = false) }
             }
         }
 
@@ -80,10 +85,6 @@ class AuriPlayerController(
                 stopProgressTracker()
             }
         }
-
-        override fun onAudioSessionIdChanged(audioSessionId: Int) {
-            attachAudioEffects(audioSessionId)
-        }
     }
 
     init {
@@ -92,152 +93,68 @@ class AuriPlayerController(
 
     private fun initPlayer() {
         try {
+            val app = context.applicationContext as? AuriApplication
+            if (app != null) {
+                preloadTrigger = NextTrackPreloadTrigger(repository, app.cacheManager)
+            }
             val player = AuriPlayerHolder.getOrCreatePlayer(context)
             player.removeListener(playerListener)
             player.addListener(playerListener)
             exoPlayer = player
-            val sessionId = player.audioSessionId
-            if (sessionId != 0) {
-                attachAudioEffects(sessionId)
-            }
-            connectMediaSessionService()
+
+            btMonitor = BluetoothA2dpMonitor(context) {
+                if (_playbackState.value.isPlaying) {
+                    exoPlayer?.pause()
+                }
+            }.apply { start() }
+
+            val token = SessionToken(context, ComponentName(context, AuriPlaybackService::class.java))
+            controllerFuture = MediaController.Builder(context, token).buildAsync()
         } catch (_: Exception) {
             // Fallback for JVM unit test environments
         }
     }
 
-    private fun connectMediaSessionService() {
-        if (controllerFuture != null) return
-        try {
-            val sessionToken = SessionToken(
-                context.applicationContext,
-                ComponentName(context.applicationContext, AuriPlaybackService::class.java)
-            )
-            val future = MediaController.Builder(context.applicationContext, sessionToken).buildAsync()
-            controllerFuture = future
-            future.addListener(
-                {
-                    try {
-                        mediaController = future.get()
-                    } catch (t: Throwable) {
-                        Log.w(TAG, "MediaController connection error: ${t.message}")
-                    }
-                },
-                ContextCompat.getMainExecutor(context.applicationContext)
-            )
-        } catch (_: Throwable) {
-            // Ignored in JVM unit test environments
-        }
-    }
-
-    private fun attachAudioEffects(audioSessionId: Int) {
-        if (audioSessionId == 0) return
-        releaseAudioEffects()
-        try {
-            hardwareEqualizer = Equalizer(0, audioSessionId).apply {
-                enabled = true
-            }
-        } catch (t: Throwable) {
-            Log.w(TAG, "Hardware Equalizer unavailable on session $audioSessionId: ${t.message}")
-            hardwareEqualizer = null
-        }
-
-        try {
-            loudnessEnhancer = LoudnessEnhancer(audioSessionId).apply {
-                enabled = true
-            }
-        } catch (t: Throwable) {
-            Log.w(TAG, "LoudnessEnhancer unavailable on session $audioSessionId: ${t.message}")
-            loudnessEnhancer = null
-        }
-
-        applyDspEffects()
-    }
-
-    private fun applyDspEffects() {
+    private fun applyDspAndOffload() {
         val state = _playbackState.value
-        applyEqPresetToHardware(state.eqPreset)
-        applyLoudnessToHardware(
-            enabled = state.isLoudnessNormalizerEnabled,
-            gainDb = state.loudnessGainDb,
-            userVolume = state.volume
+        AuriPlayerHolder.dspProcessor?.configureDsp(
+            gains = state.eqPreset.gains,
+            preampDb = state.preampDb,
+            autoHeadroom = state.autoHeadroomEnabled,
+            loudnessGainDb = state.loudnessGainDb,
+            normalizerEnabled = state.isLoudnessNormalizerEnabled
         )
-    }
 
-    private fun applyEqPresetToHardware(preset: EqPreset) {
-        val eq = hardwareEqualizer ?: return
-        try {
-            val numBands = eq.numberOfBands.toInt()
-            val range = eq.bandLevelRange
-            val minMb = range[0].toInt()
-            val maxMb = range[1].toInt()
-            val isFlat = preset == EqPreset.FLAT
-            eq.enabled = !isFlat
+        val player = exoPlayer ?: return
+        player.volume = state.volume.coerceIn(0f, 1f)
 
-            if (!isFlat && numBands > 0) {
-                for (band in 0 until numBands) {
-                    val centerHz = eq.getCenterFreq(band.toShort()) / 1000.0
-                    val interpolatedDb = interpolateIsoBandDb(centerHz, preset.gains)
-                    val targetMb = (interpolatedDb * 100.0).toInt().coerceIn(minMb, maxMb)
-                    eq.setBandLevel(band.toShort(), targetMb.toShort())
-                }
-            }
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed applying EQ preset ${preset.label}: ${t.message}")
-        }
-    }
-
-    private fun interpolateIsoBandDb(freqHz: Double, gains: FloatArray): Double {
-        if (freqHz <= ISO_CENTER_FREQS_HZ.first()) return gains.first().toDouble()
-        if (freqHz >= ISO_CENTER_FREQS_HZ.last()) return gains.last().toDouble()
-
-        for (i in 0 until ISO_CENTER_FREQS_HZ.size - 1) {
-            val f0 = ISO_CENTER_FREQS_HZ[i]
-            val f1 = ISO_CENTER_FREQS_HZ[i + 1]
-            if (freqHz in f0..f1) {
-                val t = (freqHz - f0) / (f1 - f0)
-                return gains[i] + t * (gains[i + 1] - gains[i])
-            }
-        }
-        return 0.0
-    }
-
-    private fun applyLoudnessToHardware(enabled: Boolean, gainDb: Double, userVolume: Float) {
-        val player = exoPlayer
-        if (!enabled) {
-            player?.volume = userVolume.coerceIn(0f, 1f)
-            try {
-                loudnessEnhancer?.setTargetGain(0)
-                loudnessEnhancer?.enabled = false
-            } catch (_: Throwable) {}
-            return
-        }
-
-        if (gainDb <= 0.0) {
-            // Attenuate cleanly via ExoPlayer volume multiplier
-            val linear = 10.0.pow(gainDb / 20.0).toFloat().coerceIn(0.05f, 1.0f)
-            player?.volume = (userVolume * linear).coerceIn(0f, 1f)
-            try {
-                loudnessEnhancer?.setTargetGain(0)
-                loudnessEnhancer?.enabled = false
-            } catch (_: Throwable) {}
+        val eligibility = AudioOffloadEligibility(
+            eqPreset = state.eqPreset,
+            preampDb = state.preampDb,
+            normalizerEnabled = state.isLoudnessNormalizerEnabled,
+            crossfadeActive = state.crossfadeEnabled
+        )
+        val offloadMode = if (eligibility.isEligible) {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
         } else {
-            // Positive gain for quiet masters via LoudnessEnhancer
-            player?.volume = userVolume.coerceIn(0f, 1f)
-            try {
-                loudnessEnhancer?.enabled = true
-                loudnessEnhancer?.setTargetGain((gainDb * 100.0).toInt().coerceIn(0, 1000))
-            } catch (_: Throwable) {}
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
         }
+        val params = player.trackSelectionParameters.buildUpon()
+            .setAudioOffloadPreferences(
+                AudioOffloadPreferences.Builder()
+                    .setAudioOffloadMode(offloadMode)
+                    .build()
+            )
+            .build()
+        player.trackSelectionParameters = params
+        _playbackState.update { it.copy(isOffloadActive = eligibility.isEligible) }
     }
 
     private fun startForegroundPlaybackService() {
         try {
             val intent = Intent(context, AuriPlaybackService::class.java)
             ContextCompat.startForegroundService(context, intent)
-        } catch (_: Throwable) {
-            // Ignored in JVM unit test environments
-        }
+        } catch (_: Throwable) {}
     }
 
     fun playSong(song: Song, queue: List<Song> = listOf(song)) {
@@ -246,6 +163,11 @@ class AuriPlayerController(
         val liked = repository.isSongLiked(song.id) || song.isLiked
         val initialSong = song.copy(isLiked = liked)
         val gain = repository.calculateLoudnessGain(initialSong.loudnessDb)
+
+        activeSegments = emptyList()
+        lastSkippedEndMs = -1L
+        accumulatedPlayMs = 0L
+        lastReportedSongId = null
 
         _playbackState.update {
             it.copy(
@@ -281,6 +203,13 @@ class AuriPlayerController(
                 )
             }
 
+            val app = context.applicationContext as? AuriApplication
+            if (app?.preferences?.settings?.value?.sponsorBlockEnabled == true) {
+                launch {
+                    activeSegments = app.sponsorBlock.getSkipSegments(resolvedSong.id)
+                }
+            }
+
             exoPlayer?.let { player ->
                 try {
                     if (resolvedSong.streamUrl.isNotEmpty()) {
@@ -302,12 +231,13 @@ class AuriPlayerController(
                             .build()
                         player.setMediaItem(mediaItem)
                         player.prepare()
-                        applyDspEffects()
+                        applyDspAndOffload()
                         player.play()
                     }
                 } catch (_: Exception) {}
             }
 
+            preloadTrigger?.preloadNext(updatedQueue, index)
             startProgressTracker()
         }
     }
@@ -315,7 +245,6 @@ class AuriPlayerController(
     fun togglePlayPause() {
         val currentState = _playbackState.value
         val newPlaying = !currentState.isPlaying
-
         _playbackState.update { it.copy(isPlaying = newPlaying) }
 
         exoPlayer?.let { player ->
@@ -333,11 +262,7 @@ class AuriPlayerController(
             }
         }
 
-        if (newPlaying) {
-            startProgressTracker()
-        } else {
-            stopProgressTracker()
-        }
+        if (newPlaying) startProgressTracker() else stopProgressTracker()
     }
 
     fun seekTo(positionMs: Long) {
@@ -345,6 +270,47 @@ class AuriPlayerController(
         val clamped = positionMs.coerceIn(0L, duration.coerceAtLeast(1L))
         _playbackState.update { it.copy(currentPositionMs = clamped) }
         exoPlayer?.seekTo(clamped)
+    }
+
+    fun seekBy(deltaMs: Long) {
+        val current = exoPlayer?.currentPosition ?: _playbackState.value.currentPositionMs
+        seekTo(current + deltaMs)
+    }
+
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        _playbackState.update { state ->
+            val list = state.queue.toMutableList()
+            if (fromIndex !in list.indices || toIndex !in list.indices) return@update state
+            val item = list.removeAt(fromIndex)
+            list.add(toIndex, item)
+            val newIndex = when (state.queueIndex) {
+                fromIndex -> toIndex
+                in (toIndex until fromIndex) -> state.queueIndex + 1
+                in ((fromIndex + 1)..toIndex) -> state.queueIndex - 1
+                else -> state.queueIndex
+            }
+            state.copy(queue = list, queueIndex = newIndex)
+        }
+    }
+
+    fun removeQueueItem(index: Int) {
+        _playbackState.update { state ->
+            val list = state.queue.toMutableList()
+            if (index !in list.indices || list.size <= 1) return@update state
+            list.removeAt(index)
+            val newIndex = when {
+                index < state.queueIndex -> state.queueIndex - 1
+                state.queueIndex >= list.size -> list.lastIndex
+                else -> state.queueIndex
+            }
+            state.copy(queue = list, queueIndex = newIndex)
+        }
+    }
+
+    fun setPreferredAudioDevice(device: AudioDeviceInfo?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            runCatching { exoPlayer?.setPreferredAudioDevice(device) }
+        }
     }
 
     fun skipNext() {
@@ -396,18 +362,18 @@ class AuriPlayerController(
             val gain = if (enabled) repository.calculateLoudnessGain(it.currentSong?.loudnessDb) else 0.0
             it.copy(isLoudnessNormalizerEnabled = enabled, loudnessGainDb = gain)
         }
-        applyDspEffects()
+        applyDspAndOffload()
     }
 
     fun setEqPreset(preset: EqPreset) {
         _playbackState.update { it.copy(eqPreset = preset) }
-        applyEqPresetToHardware(preset)
+        applyDspAndOffload()
     }
 
     fun setVolume(volume: Float) {
         val clamped = volume.coerceIn(0f, 1f)
         _playbackState.update { it.copy(volume = clamped) }
-        applyDspEffects()
+        applyDspAndOffload()
     }
 
     fun toggleLikeCurrentSong() {
@@ -429,9 +395,7 @@ class AuriPlayerController(
                 seekTo(0L)
                 exoPlayer?.play()
             }
-            RepeatMode.ALL -> {
-                skipNext()
-            }
+            RepeatMode.ALL -> skipNext()
             RepeatMode.OFF -> {
                 val state = _playbackState.value
                 if (state.queueIndex < state.queue.size - 1) {
@@ -449,12 +413,54 @@ class AuriPlayerController(
             while (isActive) {
                 exoPlayer?.let { player ->
                     if (player.isPlaying) {
+                        val pos = player.currentPosition
+                        val state = _playbackState.value
                         _playbackState.update {
                             it.copy(
-                                currentPositionMs = player.currentPosition,
+                                currentPositionMs = pos,
                                 bufferedPositionMs = player.bufferedPosition,
                                 durationMs = if (player.duration > 0) player.duration else it.durationMs
                             )
+                        }
+
+                        // SponsorBlock check
+                        if (activeSegments.isNotEmpty()) {
+                            val hit = activeSegments.firstOrNull { pos in it.startMs until (it.endMs - 250L) }
+                            if (hit != null && hit.endMs != lastSkippedEndMs) {
+                                lastSkippedEndMs = hit.endMs
+                                seekTo(hit.endMs)
+                            }
+                        }
+
+                        // Offload stall detection (2s stuck while playing)
+                        if (state.isOffloadActive) {
+                            if (pos == lastStallCheckPos) {
+                                stallTicks++
+                                if (stallTicks >= 8) {
+                                    stallTicks = 0
+                                    // Recover by disabling offload
+                                    val params = player.trackSelectionParameters.buildUpon()
+                                        .setAudioOffloadPreferences(
+                                            AudioOffloadPreferences.Builder()
+                                                .setAudioOffloadMode(AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED)
+                                                .build()
+                                        )
+                                        .build()
+                                    player.trackSelectionParameters = params
+                                    _playbackState.update { it.copy(isOffloadActive = false) }
+                                }
+                            } else {
+                                stallTicks = 0
+                            }
+                            lastStallCheckPos = pos
+                        }
+
+                        // Record play event once >= 30s accumulated
+                        accumulatedPlayMs += 250L
+                        val currentSong = state.currentSong
+                        if (accumulatedPlayMs >= 30_000L && currentSong != null && lastReportedSongId != currentSong.id) {
+                            lastReportedSongId = currentSong.id
+                            launch { repository.recordPlayEvent(currentSong, accumulatedPlayMs) }
                         }
                     }
                 }
@@ -468,31 +474,14 @@ class AuriPlayerController(
         progressJob = null
     }
 
-    private fun releaseAudioEffects() {
-        try {
-            hardwareEqualizer?.release()
-        } catch (_: Throwable) {}
-        hardwareEqualizer = null
-        try {
-            loudnessEnhancer?.release()
-        } catch (_: Throwable) {}
-        loudnessEnhancer = null
-    }
-
     fun release() {
         playResolutionJob?.cancel()
+        preloadTrigger?.cancel()
         stopProgressTracker()
-        releaseAudioEffects()
+        btMonitor?.stop()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
         exoPlayer?.removeListener(playerListener)
         exoPlayer = null
-    }
-
-    companion object {
-        private const val TAG = "AuriPlayerController"
-        private val ISO_CENTER_FREQS_HZ = doubleArrayOf(
-            31.0, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
-        )
     }
 }

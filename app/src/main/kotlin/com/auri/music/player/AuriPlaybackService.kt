@@ -15,34 +15,73 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.auri.music.AuriApplication
 import com.auri.music.MainActivity
 import com.auri.music.R
 
 /**
- * Shared holder so the Foreground MediaSessionService and UI controller
- * operate on the exact same ExoPlayer instance without duplicating audio pipelines.
+ * Shared player factory & holder so MediaSessionService and AuriPlayerController
+ * share one ExoPlayer backed by AURI's Rust DSP AudioProcessor and SimpleCache.
  */
+@OptIn(UnstableApi::class)
 object AuriPlayerHolder {
     @Volatile
     private var player: ExoPlayer? = null
+
+    @Volatile
+    var dspProcessor: AuriDspAudioProcessor? = null
+        private set
 
     fun getOrCreatePlayer(context: Context): ExoPlayer {
         player?.let { return it }
         synchronized(this) {
             player?.let { return it }
+            val appContext = context.applicationContext
+            val processor = AuriDspAudioProcessor()
+            dspProcessor = processor
+
+            val renderersFactory = object : DefaultRenderersFactory(appContext) {
+                override fun buildAudioSink(
+                    ctx: Context,
+                    enableFloatOutput: Boolean,
+                    enableAudioTrackPlaybackParams: Boolean
+                ): AudioSink {
+                    return DefaultAudioSink.Builder(ctx)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                        .setAudioProcessors(arrayOf(processor))
+                        .build()
+                }
+            }
+
             val audioAttributes = AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
                 .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                 .build()
 
-            val created = ExoPlayer.Builder(context.applicationContext)
+            val builder = ExoPlayer.Builder(appContext, renderersFactory)
                 .setAudioAttributes(audioAttributes, true)
                 .setHandleAudioBecomingNoisy(true)
-                .build()
+                .setWakeMode(C.WAKE_MODE_NETWORK)
+
+            val app = appContext as? AuriApplication
+            if (app != null) {
+                val dataSourceFactory = app.cacheManager.createPlaybackDataSourceFactory(
+                    repository = app.repository,
+                    dao = app.database.auriDao()
+                )
+                builder.setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            }
+
+            val created = builder.build()
             player = created
             return created
         }
@@ -52,6 +91,7 @@ object AuriPlayerHolder {
         synchronized(this) {
             player?.release()
             player = null
+            dspProcessor = null
         }
     }
 }
