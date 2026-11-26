@@ -232,28 +232,38 @@ fun HomeScreen(
                     }
                 }
 
-                // 3x3 Grid
-                val dialItems = quickPicks.take(9)
+                // 3x3 Grid (8 songs + 1 Surprise Dice)
+                val dialItems = quickPicks.take(8)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    dialItems.chunked(3).forEach { rowSongs ->
+                    val allCells = dialItems + listOf<Song?>(null) // null represents the Dice
+                    allCells.chunked(3).forEach { rowCells ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            rowSongs.forEach { song ->
-                                MetrolistSpeedDialCard(
-                                    song = song,
-                                    onClick = { onSongClick(song, quickPicks) },
-                                    modifier = Modifier.weight(1f)
-                                )
+                            rowCells.forEach { cell ->
+                                if (cell != null) {
+                                    MetrolistSpeedDialCard(
+                                        song = cell,
+                                        onClick = { onSongClick(cell, quickPicks) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    MetrolistDiceCard(
+                                        onClick = {
+                                            val randomSong = quickPicks.randomOrNull()
+                                            if (randomSong != null) onSongClick(randomSong, quickPicks)
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
-                            // Fill remaining space if less than 3 in row
-                            repeat(3 - rowSongs.size) {
+                            repeat(3 - rowCells.size) {
                                 Spacer(modifier = Modifier.weight(1f))
                             }
                         }
@@ -292,28 +302,47 @@ fun HomeScreen(
             }
         }
 
-        // Quick picks Shelf
+        // Quick picks Shelf (Metrolist style: Header with circular action button, and vertical list of song rows)
         item {
-            Text(
-                text = "Quick picks",
-                color = AuriTextPrimary,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-            )
-
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(quickPicks) { song ->
-                    MetrolistCarouselCard(
-                        song = song,
-                        onClick = { onSongClick(song, quickPicks) }
-                    )
+                Text(
+                    text = "Quick picks",
+                    color = scheme.onSurface,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Surface(
+                    onClick = { onSongClick(quickPicks.first(), quickPicks) },
+                    shape = CircleShape,
+                    color = scheme.primaryContainer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Play all",
+                            tint = scheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+        }
+
+        items(quickPicks.take(4)) { song ->
+            MetrolistSongRowItem(
+                song = song,
+                onClick = { onSongClick(song, quickPicks) }
+            )
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         // Keep Listening Shelf
@@ -362,9 +391,39 @@ fun HomeScreen(
     }
 }
 
+@Composable
+private fun MetrolistDiceCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(scheme.surfaceVariant.copy(alpha = 0.5f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.size(36.dp)) {
+            val dotRadius = 3.2.dp.toPx()
+            val color = scheme.onSurfaceVariant.copy(alpha = 0.9f)
+            val w = size.width
+            val h = size.height
+
+            // 5 dots (die face 5)
+            drawCircle(color, dotRadius, androidx.compose.ui.geometry.Offset(w * 0.22f, h * 0.22f))
+            drawCircle(color, dotRadius, androidx.compose.ui.geometry.Offset(w * 0.78f, h * 0.22f))
+            drawCircle(color, dotRadius, androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.50f))
+            drawCircle(color, dotRadius, androidx.compose.ui.geometry.Offset(w * 0.22f, h * 0.78f))
+            drawCircle(color, dotRadius, androidx.compose.ui.geometry.Offset(w * 0.78f, h * 0.78f))
+        }
+    }
+}
+
 /**
  * 3x3 Speed Dial Card matching Metrolist:
- * - Square card with rounded corners (16dp)
+ * - Square card with rounded corners (12dp)
  * - Album artwork filling the card
  * - Dark gradient scrim at the bottom with title
  */
@@ -374,21 +433,21 @@ private fun MetrolistSpeedDialCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     Surface(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, AuriGlassBorder, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = AuriGlassSurfaceElevated
+        shape = RoundedCornerShape(12.dp),
+        color = scheme.surfaceContainerHigh
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AlbumArt(
                 thumbnailUrl = song.thumbnailUrl,
                 contentDescription = song.title,
                 modifier = Modifier.fillMaxSize(),
-                cornerRadius = 16.dp
+                cornerRadius = 12.dp
             )
 
             // Bottom gradient overlay for title legibility
@@ -399,21 +458,21 @@ private fun MetrolistSpeedDialCard(
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color(0xDD08080B))
+                            colors = listOf(Color.Transparent, Color(0xDD000000))
                         )
                     )
             )
 
             Text(
                 text = song.title,
-                color = AuriTextPrimary,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 7.dp, vertical = 5.dp)
             )
         }
     }
@@ -516,41 +575,26 @@ private fun MetrolistSongRowItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
-                    color = AuriTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text(
-                        text = song.artist,
-                        color = AuriTextSecondary,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (song.isOpus) "OPUS" else "AAC",
-                        color = AuriGreenHighRes,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .background(Color(0x2210B981), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${song.artist} • 140M plays",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             IconButton(onClick = { }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "Options",
-                    tint = AuriTextMuted,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
             }
