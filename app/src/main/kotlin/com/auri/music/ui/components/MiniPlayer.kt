@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -77,6 +78,7 @@ fun MiniPlayer(
 ) {
     val currentSong = playbackState.currentSong ?: return
     val shape = RoundedCornerShape(34.dp)
+    val scheme = MaterialTheme.colorScheme
 
     Surface(
         modifier = modifier
@@ -84,14 +86,14 @@ fun MiniPlayer(
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .height(MetrolistMiniPlayerHeight)
             .clip(shape)
-            .border(1.dp, AuriGlassBorder, shape)
+            .border(1.dp, scheme.outlineVariant.copy(alpha = 0.2f), shape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = AuriVioletBright),
+                indication = ripple(color = scheme.primary),
                 onClick = onExpandClick
             ),
         shape = shape,
-        color = AuriGlassSurfaceElevated.copy(alpha = 0.96f),
+        color = scheme.surfaceContainerHigh,
         shadowElevation = 8.dp
     ) {
         Row(
@@ -122,7 +124,7 @@ fun MiniPlayer(
             ) {
                 Text(
                     text = currentSong.title,
-                    color = AuriTextPrimary,
+                    color = scheme.onSurface,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -130,7 +132,7 @@ fun MiniPlayer(
                 )
                 Text(
                     text = currentSong.artist,
-                    color = AuriTextSecondary,
+                    color = scheme.onSurfaceVariant,
                     fontSize = 11.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -151,7 +153,7 @@ fun MiniPlayer(
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
-                        tint = AuriTextPrimary,
+                        tint = scheme.onSurface,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -160,7 +162,7 @@ fun MiniPlayer(
                 Surface(
                     onClick = onPlayPauseClick,
                     shape = CircleShape,
-                    color = AuriVioletBright,
+                    color = scheme.primary,
                     modifier = Modifier.size(42.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -172,7 +174,7 @@ fun MiniPlayer(
                             Icon(
                                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = AuriObsidianBackground,
+                                tint = scheme.onPrimary,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -186,7 +188,7 @@ fun MiniPlayer(
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        tint = AuriTextPrimary,
+                        tint = scheme.onSurface,
                         modifier = Modifier.size(20.dp)
                     )
                 }

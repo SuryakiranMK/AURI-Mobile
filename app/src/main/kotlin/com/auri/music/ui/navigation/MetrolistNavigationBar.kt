@@ -67,16 +67,17 @@ fun MetrolistNavigationBar(
     onTabSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = AuriGlassBorder.copy(alpha = 0.5f),
+                color = scheme.outlineVariant.copy(alpha = 0.3f),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ),
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        color = AuriGlassSurface.copy(alpha = 0.98f),
+        color = scheme.surfaceContainer,
         tonalElevation = 8.dp
     ) {
         Row(
@@ -90,7 +91,7 @@ fun MetrolistNavigationBar(
             tabs.forEach { tab ->
                 val isSelected = tab.id == selectedTab
                 val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) AuriVioletBright else AuriTextMuted,
+                    targetValue = if (isSelected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
                     animationSpec = spring(dampingRatio = 0.9f, stiffness = 700f),
                     label = "tabContentColor"
                 )
@@ -102,7 +103,7 @@ fun MetrolistNavigationBar(
                         .weight(1f)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false, radius = 32.dp, color = AuriVioletBright),
+                            indication = ripple(bounded = false, radius = 32.dp, color = scheme.primary),
                             role = Role.Tab,
                             onClick = { onTabSelected(tab.id) }
                         )
@@ -115,7 +116,7 @@ fun MetrolistNavigationBar(
                             .size(width = 64.dp, height = 32.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isSelected) AuriVioletContainer else Color.Transparent
+                                if (isSelected) scheme.secondaryContainer else Color.Transparent
                             )
                     ) {
                         Icon(

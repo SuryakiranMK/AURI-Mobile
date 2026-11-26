@@ -137,7 +137,8 @@ fun LibraryScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(AuriObsidianBackground)) {
+    val scheme = MaterialTheme.colorScheme
+    Box(modifier = modifier.fillMaxSize().background(scheme.background)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 150.dp)
@@ -167,12 +168,12 @@ fun LibraryScreen(
                     items(LibraryTab.entries.toTypedArray()) { tab ->
                         val isSelected = tab == selectedTab
                         val chipBg by animateColorAsState(
-                            targetValue = if (isSelected) AuriVioletContainer else AuriGlassSurfaceElevated,
+                            targetValue = if (isSelected) scheme.secondaryContainer else scheme.surfaceContainer,
                             animationSpec = spring(dampingRatio = 0.9f, stiffness = 700f),
                             label = "libTabBg"
                         )
                         val chipText by animateColorAsState(
-                            targetValue = if (isSelected) AuriVioletBright else AuriTextSecondary,
+                            targetValue = if (isSelected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
                             label = "libTabTxt"
                         )
 
@@ -182,7 +183,7 @@ fun LibraryScreen(
                                 .clip(CircleShape)
                                 .border(
                                     1.dp,
-                                    if (isSelected) AuriVioletBright.copy(alpha = 0.6f) else AuriGlassBorder,
+                                    if (isSelected) scheme.primary.copy(alpha = 0.5f) else scheme.outlineVariant.copy(alpha = 0.2f),
                                     CircleShape
                                 )
                                 .selectable(
@@ -190,7 +191,7 @@ fun LibraryScreen(
                                     onClick = { selectedTab = tab },
                                     role = Role.Tab,
                                     interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(bounded = true, color = AuriVioletBright)
+                                    indication = ripple(bounded = true, color = scheme.primary)
                                 ),
                             shape = CircleShape,
                             color = chipBg
@@ -456,7 +457,7 @@ fun LibraryScreen(
         Surface(
             onClick = { },
             shape = CircleShape,
-            color = AuriVioletBright,
+            color = scheme.primaryContainer,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 20.dp, bottom = 90.dp)
@@ -470,13 +471,13 @@ fun LibraryScreen(
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = null,
-                    tint = AuriObsidianBackground,
+                    tint = scheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "New playlist",
-                    color = AuriObsidianBackground,
+                    color = scheme.onPrimaryContainer,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold
                 )

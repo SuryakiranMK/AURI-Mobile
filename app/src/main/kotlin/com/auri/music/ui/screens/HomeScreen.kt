@@ -100,10 +100,11 @@ fun HomeScreen(
         }
     }
 
+    val scheme = MaterialTheme.colorScheme
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(AuriObsidianBackground),
+            .background(scheme.background),
         contentPadding = PaddingValues(bottom = 140.dp)
     ) {
         // Metrolist Top Bar: Home title on left, Action Icons on right
@@ -118,7 +119,7 @@ fun HomeScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Home",
-                        color = AuriTextPrimary,
+                        color = scheme.onBackground,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = (-0.5).sp
@@ -127,13 +128,13 @@ fun HomeScreen(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { }) {
-                        Icon(Icons.Default.History, contentDescription = "History", tint = AuriTextPrimary)
+                        Icon(Icons.Default.History, contentDescription = "History", tint = scheme.onSurface)
                     }
                     IconButton(onClick = { }) {
-                        Icon(Icons.Default.People, contentDescription = "Listen Together", tint = AuriTextPrimary)
+                        Icon(Icons.Default.People, contentDescription = "Listen Together", tint = scheme.onSurface)
                     }
                     IconButton(onClick = { }) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = AuriTextPrimary)
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = scheme.onSurface)
                     }
                 }
             }
@@ -151,12 +152,12 @@ fun HomeScreen(
                 items(filterChips) { chip ->
                     val isSelected = chip == selectedCategory
                     val chipBg by animateColorAsState(
-                        targetValue = if (isSelected) AuriVioletContainer else AuriGlassSurfaceElevated,
+                        targetValue = if (isSelected) scheme.secondaryContainer else scheme.surfaceContainer,
                         animationSpec = spring(dampingRatio = 0.9f, stiffness = 700f),
                         label = "homeChipBg"
                     )
                     val chipText by animateColorAsState(
-                        targetValue = if (isSelected) AuriVioletBright else AuriTextSecondary,
+                        targetValue = if (isSelected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
                         label = "homeChipText"
                     )
 
@@ -166,7 +167,7 @@ fun HomeScreen(
                             .clip(CircleShape)
                             .border(
                                 1.dp,
-                                if (isSelected) AuriVioletBright.copy(alpha = 0.6f) else AuriGlassBorder,
+                                if (isSelected) scheme.primary.copy(alpha = 0.5f) else scheme.outlineVariant.copy(alpha = 0.2f),
                                 CircleShape
                             )
                             .selectable(
@@ -176,7 +177,7 @@ fun HomeScreen(
                                 },
                                 role = Role.Tab,
                                 interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = true, color = AuriVioletBright)
+                                indication = ripple(bounded = true, color = scheme.primary)
                             ),
                         shape = CircleShape,
                         color = chipBg
@@ -210,21 +211,21 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = "Speed dial",
-                        color = AuriTextPrimary,
+                        color = scheme.onSurface,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Surface(
                         onClick = { onSongClick(quickPicks.first(), quickPicks) },
                         shape = CircleShape,
-                        color = AuriVioletContainer,
+                        color = scheme.primaryContainer,
                         modifier = Modifier.size(36.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Icon(
                                 imageVector = Icons.Default.ChevronRight,
                                 contentDescription = "Play all",
-                                tint = AuriVioletBright,
+                                tint = scheme.onPrimaryContainer,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -271,21 +272,21 @@ fun HomeScreen(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(AuriVioletBright)
+                            .background(scheme.primary)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(AuriTextMuted.copy(alpha = 0.4f))
+                            .background(scheme.onSurfaceVariant.copy(alpha = 0.3f))
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(AuriTextMuted.copy(alpha = 0.4f))
+                            .background(scheme.onSurfaceVariant.copy(alpha = 0.3f))
                     )
                 }
             }
@@ -444,20 +445,21 @@ private fun MetrolistCarouselCard(
                 cornerRadius = 18.dp
             )
             // Play overlay circle
+            val scheme = MaterialTheme.colorScheme
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(8.dp)
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(AuriVioletBright)
-                    .border(1.dp, AuriVioletBright, CircleShape),
+                    .background(scheme.primary)
+                    .border(1.dp, scheme.primary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = "Play",
-                    tint = AuriObsidianBackground,
+                    tint = scheme.onPrimary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -465,7 +467,7 @@ private fun MetrolistCarouselCard(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = song.title,
-            color = AuriTextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 13.5.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -473,7 +475,7 @@ private fun MetrolistCarouselCard(
         )
         Text(
             text = song.artist,
-            color = AuriTextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.5.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

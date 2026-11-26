@@ -408,17 +408,18 @@ fun NowPlayingSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Circular Previous button
+                val scheme = MaterialTheme.colorScheme
                 Surface(
                     onClick = onPrevious,
                     shape = CircleShape,
-                    color = AuriGlassSurfaceElevated,
+                    color = scheme.surfaceContainerHigh,
                     modifier = Modifier.size(54.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Icon(
                             imageVector = Icons.Default.SkipPrevious,
                             contentDescription = "Previous",
-                            tint = AuriTextPrimary,
+                            tint = scheme.onSurface,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -430,11 +431,11 @@ fun NowPlayingSheet(
                 Surface(
                     onClick = onPlayPause,
                     shape = CircleShape,
-                    color = AuriVioletBright,
+                    color = scheme.primary,
                     modifier = Modifier
                         .width(130.dp)
                         .height(60.dp)
-                        .shadow(12.dp, CircleShape, ambientColor = AuriVioletGlow, spotColor = AuriVioletGlow)
+                        .shadow(12.dp, CircleShape)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
@@ -450,13 +451,13 @@ fun NowPlayingSheet(
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (isPlaying) "Pause" else "Play",
-                                    tint = AuriObsidianBackground,
+                                    tint = scheme.onPrimary,
                                     modifier = Modifier.size(28.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = if (isPlaying) "Pause" else "Play",
-                                    color = AuriObsidianBackground,
+                                    color = scheme.onPrimary,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -471,14 +472,14 @@ fun NowPlayingSheet(
                 Surface(
                     onClick = onNext,
                     shape = CircleShape,
-                    color = AuriGlassSurfaceElevated,
+                    color = scheme.surfaceContainerHigh,
                     modifier = Modifier.size(54.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Icon(
                             imageVector = Icons.Default.SkipNext,
                             contentDescription = "Next",
-                            tint = AuriTextPrimary,
+                            tint = scheme.onSurface,
                             modifier = Modifier.size(28.dp)
                         )
                     }
