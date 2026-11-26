@@ -335,6 +335,110 @@ impl Equalizer {
     }
 }
 
+/// Computes negative preamp headroom (in dB) equal to the highest positive EQ band boost,
+/// preventing digital clipping before the soft-knee peak limiter.
+pub fn compute_auto_headroom_db(gains: &[f32; 10]) -> f32 {
+    let max_boost = gains.iter().copied().fold(0.0_f32, f32::max).max(0.0);
+    if max_boost >= 0.05 { -max_boost } else { 0.0 }
+}
+
+/// Complete per-stream PCM DSP pipeline: 10-band ISO EQ + Auto-Headroom +
+/// -14.0 LUFS Loudness Normalization + Soft-Knee Peak Limiter.
+#[derive(Debug, Clone)]
+pub struct AudioPipeline {
+    eq: Equalizer,
+    limiter: SoftLimiter,
+    loudness_gain_db: f64,
+    normalizer_enabled: bool,
+    auto_headroom_enabled: bool,
+    user_preamp_db: f32,
+    gains: [f32; 10],
+    scratch_f32: Vec<f32>,
+}
+
+impl AudioPipeline {
+    pub fn new(sample_rate: u32) -> Self {
+        Self {
+            eq: Equalizer::new(sample_rate.max(8_000)),
+            limiter: SoftLimiter::default(),
+            loudness_gain_db: 0.0,
+            normalizer_enabled: true,
+            auto_headroom_enabled: true,
+            user_preamp_db: 0.0,
+            gains: [0.0; 10],
+            scratch_f32: Vec::with_capacity(4096),
+        }
+    }
+
+    pub fn configure(
+        &mut self,
+        gains: [f32; 10],
+        user_preamp_db: f32,
+        auto_headroom_enabled: bool,
+        loudness_gain_db: f64,
+        normalizer_enabled: bool,
+    ) {
+        self.gains = gains;
+        self.user_preamp_db = user_preamp_db.clamp(-12.0, 12.0);
+        self.auto_headroom_enabled = auto_headroom_enabled;
+        self.loudness_gain_db = if loudness_gain_db.is_finite() {
+            loudness_gain_db.clamp(MIN_CUT_DB, MAX_BOOST_DB)
+        } else {
+            -4.5
+        };
+        self.normalizer_enabled = normalizer_enabled;
+
+        let headroom = if auto_headroom_enabled {
+            compute_auto_headroom_db(&self.gains)
+        } else {
+            0.0
+        };
+        self.eq.set_gains(self.gains);
+        self.eq.set_preamp(self.user_preamp_db + headroom);
+    }
+
+    pub fn reset(&mut self) {
+        self.eq.reset_states();
+    }
+
+    pub fn process_pcm_float(&mut self, pcm: &mut [f32], channels: usize, sample_rate: u32) {
+        if pcm.is_empty() || channels == 0 {
+            return;
+        }
+        self.eq.process_interleaved(pcm, channels, sample_rate);
+        let gain_mult = if self.normalizer_enabled {
+            db_to_linear(self.loudness_gain_db)
+        } else {
+            1.0
+        };
+        self.limiter.process_buffer(pcm, gain_mult);
+    }
+
+    pub fn process_pcm16(&mut self, pcm: &mut [i16], channels: usize, sample_rate: u32) {
+        if pcm.is_empty() || channels == 0 {
+            return;
+        }
+        if self.scratch_f32.len() < pcm.len() {
+            self.scratch_f32.resize(pcm.len(), 0.0);
+        }
+        let buf = &mut self.scratch_f32[..pcm.len()];
+        for (dst, &src) in buf.iter_mut().zip(pcm.iter()) {
+            *dst = (src as f32) / 32768.0;
+        }
+        self.eq.process_interleaved(buf, channels, sample_rate);
+        let gain_mult = if self.normalizer_enabled {
+            db_to_linear(self.loudness_gain_db)
+        } else {
+            1.0
+        };
+        self.limiter.process_buffer(buf, gain_mult);
+        for (dst, &src) in pcm.iter_mut().zip(buf.iter()) {
+            let scaled = (src * 32767.0).clamp(-32768.0, 32767.0);
+            *dst = scaled.round() as i16;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,6 +504,28 @@ mod tests {
         eq.process_interleaved(&mut buffer, 2, 48_000);
         for &s in &buffer {
             assert!(s.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_auto_headroom_and_audio_pipeline() {
+        let bass = EqPreset::BassPunch.gains();
+        assert!((compute_auto_headroom_db(&bass) - (-6.0)).abs() < 0.01);
+        assert_eq!(compute_auto_headroom_db(&EqPreset::Flat.gains()), 0.0);
+
+        let mut pipeline = AudioPipeline::new(48_000);
+        pipeline.configure(bass, 0.0, true, 3.0, true);
+
+        let mut pcm16: Vec<i16> = vec![16_000, -16_000, 24_000, -24_000, 32_000, -32_000];
+        pipeline.process_pcm16(&mut pcm16, 2, 48_000);
+        for &s in &pcm16 {
+            assert!(s.abs() <= 32_767);
+        }
+
+        let mut pcm_f = vec![0.9_f32, -0.9_f32, 0.5_f32, -0.5_f32];
+        pipeline.process_pcm_float(&mut pcm_f, 2, 48_000);
+        for &s in &pcm_f {
+            assert!(s.is_finite() && s.abs() < 1.0);
         }
     }
 }

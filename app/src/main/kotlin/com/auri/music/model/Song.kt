@@ -1,7 +1,9 @@
 package com.auri.music.model
 
-import java.io.Serializable
+import kotlinx.serialization.Serializable
+import java.io.Serializable as JavaSerializable
 
+@Serializable
 data class Song(
     val id: String,
     val title: String,
@@ -15,21 +17,40 @@ data class Song(
     val audioQuality: String = "OPUS 160 kbps • HIGH RES",
     val loudnessDb: Double? = null,
     val isLiked: Boolean = false
-) : Serializable
+) : JavaSerializable
 
 enum class RepeatMode {
     OFF, ALL, ONE
 }
 
-data class LyricsLine(
-    val timestampMs: Long,
+@Serializable
+enum class LyricSyncType {
+    RICH_SYNCED,
+    LINE_SYNCED,
+    UNSYNCED
+}
+
+@Serializable
+data class LyricWord(
+    val startMs: Long,
+    val endMs: Long,
     val text: String
 )
 
+@Serializable
+data class LyricsLine(
+    val timestampMs: Long,
+    val text: String,
+    val endMs: Long? = null,
+    val words: List<LyricWord> = emptyList()
+)
+
+@Serializable
 data class Lyrics(
     val syncedLines: List<LyricsLine> = emptyList(),
     val plainText: String = "",
-    val source: String = "YouTube Music / LRCLIB"
+    val source: String = "YouTube Music / LRCLIB",
+    val syncType: LyricSyncType = LyricSyncType.LINE_SYNCED
 )
 
 enum class EqPreset(val label: String, val gains: FloatArray) {
@@ -55,6 +76,11 @@ data class PlaybackState(
     val isLoudnessNormalizerEnabled: Boolean = true,
     val loudnessGainDb: Double = -7.0,
     val eqPreset: EqPreset = EqPreset.FLAT,
+    val autoHeadroomEnabled: Boolean = true,
+    val preampDb: Float = 0f,
+    val crossfadeEnabled: Boolean = false,
+    val crossfadeDurationMs: Int = 4000,
+    val isOffloadActive: Boolean = false,
     val queue: List<Song> = emptyList(),
     val queueIndex: Int = -1
 )

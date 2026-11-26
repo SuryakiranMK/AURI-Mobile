@@ -2,6 +2,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+  alias(libs.plugins.ksp)
 }
 
 android {
@@ -11,8 +12,8 @@ android {
     applicationId = "com.auri.music"
     minSdk = 24
     targetSdk = 37
-    versionCode = 1
-    versionName = "1.0.0"
+    versionCode = 2
+    versionName = "1.1.0"
   }
 
   buildTypes {
@@ -73,8 +74,19 @@ dependencies {
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.session)
   implementation(libs.androidx.media3.ui)
-  // Image loading
+  implementation(libs.androidx.media3.datasource.okhttp)
+  implementation(libs.androidx.media3.database)
+  // Image loading & Networking
   implementation(libs.coil.compose)
+  implementation(libs.okhttp)
+  implementation(libs.kotlinx.serialization.json)
+  // Persistence (Room + DataStore)
+  implementation(libs.androidx.room.runtime)
+  implementation(libs.androidx.room.ktx)
+  ksp(libs.androidx.room.compiler)
+  implementation(libs.androidx.datastore.preferences)
+  // Reorderable Queue UI
+  implementation(libs.compose.reorderable)
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
   // Instrumented tests

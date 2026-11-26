@@ -133,6 +133,12 @@ pub struct Stream {
     pub duration_ms: u64,
     pub opus: bool,
     pub loudness_db: Option<f64>,
+    pub itag: u64,
+    pub mime_type: String,
+    pub codecs: String,
+    pub bitrate: u64,
+    pub sample_rate: u32,
+    pub expires_in_seconds: u64,
     pub fallback: Option<Box<Stream>>,
 }
 
@@ -542,29 +548,44 @@ impl Client {
     }
 
     pub fn stream(&self, video_id: &str) -> Result<Stream, String> {
+        self.stream_with_language(video_id, "")
+    }
+
+    pub fn stream_with_language(&self, video_id: &str, preferred_lang: &str) -> Result<Stream, String> {
         let low = self.low_quality.load(std::sync::atomic::Ordering::Relaxed);
-        crate::log_stream!("YTM", "Resolving stream for video_id={video_id} (low_quality={low})");
+        let key = format!("{video_id}:{low}:{preferred_lang}");
+        stream_coalescer().resolve(&key, || self.resolve_stream_uncached(video_id, low, preferred_lang))
+    }
+
+    fn resolve_stream_uncached(&self, video_id: &str, low: bool, preferred_lang: &str) -> Result<Stream, String> {
+        if client_health().is_in_cooldown("player") {
+            crate::log_warn!("YTM", "Player client in cooldown, attempting recovery for {video_id}");
+        }
+        crate::log_stream!("YTM", "Resolving stream for video_id={video_id} (low_quality={low}, lang={preferred_lang})");
         let mut response = self.player(video_id)?;
-        if audio_with_quality(&response, low).is_none() {
+        if audio_with_preferences(&response, low, preferred_lang).is_none() {
             crate::log_warn!("YTM", "No audio stream returned with current visitor data for {video_id}. Resetting visitor...");
             self.visitor.lock().unwrap().clear();
             response = self.player(video_id)?;
         }
-        if audio_with_quality(&response, low).is_none() && self.refresh_clients() {
+        if audio_with_preferences(&response, low, preferred_lang).is_none() && self.refresh_clients() {
             crate::log_warn!("YTM", "Retrying player API after remote client refresh for {video_id}...");
             response = self.player(video_id)?;
         }
-        match audio_with_quality(&response, low) {
+        match audio_with_preferences(&response, low, preferred_lang) {
             Some(stream) => {
+                client_health().record_success("player");
                 crate::log_stream!(
                     "YTM",
-                    "Resolved audio stream for {video_id}: len={} bytes, opus={}",
+                    "Resolved audio stream for {video_id}: itag={}, len={} bytes, opus={}",
+                    stream.itag,
                     stream.len,
                     stream.opus
                 );
                 Ok(stream)
             }
             None => {
+                client_health().record_failure("player");
                 let status = &response["playabilityStatus"];
                 let status_str = status["status"].as_str().unwrap_or("UNKNOWN");
                 let reason = status["reason"].as_str().unwrap_or("No reason provided");
@@ -921,19 +942,81 @@ fn audio(response: &Value) -> Option<Stream> {
 }
 
 fn audio_with_quality(response: &Value, low_quality: bool) -> Option<Stream> {
+    audio_with_preferences(response, low_quality, "")
+}
+
+/// Scores an adaptive format's `xtags` so original-language tracks beat AI auto-dubs.
+fn xtags_priority_score(format: &Value, preferred_lang: &str) -> i32 {
+    let xtags = format["xtags"].as_str().unwrap_or("");
+    let audio_track_id = format["audioTrack"]["id"].as_str().unwrap_or("");
+    let is_default_track = format["audioTrack"]["audioIsDefault"].as_bool().unwrap_or(false);
+
+    if !preferred_lang.is_empty() {
+        let lang_tag = format!("lang={preferred_lang}");
+        if xtags.contains(&lang_tag) || audio_track_id.starts_with(preferred_lang) {
+            return 30;
+        }
+    }
+    if xtags.contains("acont=original") {
+        return 25;
+    }
+    if is_default_track {
+        return 15;
+    }
+    if xtags.contains("acont=dubbed") {
+        return -10;
+    }
+    10
+}
+
+fn parse_mime_and_codecs(mime_raw: &str) -> (String, String) {
+    let mut parts = mime_raw.split(';');
+    let mime = parts.next().unwrap_or("").trim().to_string();
+    let codecs = parts
+        .find_map(|p| {
+            let trimmed = p.trim();
+            trimmed.strip_prefix("codecs=").map(|c| c.trim_matches('"').to_string())
+        })
+        .unwrap_or_default();
+    (mime, codecs)
+}
+
+fn audio_with_preferences(response: &Value, low_quality: bool, preferred_lang: &str) -> Option<Stream> {
     let formats = response["streamingData"]["adaptiveFormats"]
         .as_array()
         .filter(|_| playable(response))?;
     let loudness_db = response["playerConfig"]["audioConfig"]["loudnessDb"].as_f64();
-    let find = |itag| {
-        let format = formats.iter().find(|f| f["itag"].as_u64() == Some(itag))?;
-        let number = |key: &str| format[key].as_str().and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+    let expires_in_seconds = response["streamingData"]["expiresInSeconds"]
+        .as_str()
+        .and_then(|s| s.parse::<u64>().ok())
+        .or_else(|| response["streamingData"]["expiresInSeconds"].as_u64())
+        .unwrap_or(21_600);
+
+    let find = |itag: u64| -> Option<Stream> {
+        let format = formats
+            .iter()
+            .filter(|f| f["itag"].as_u64() == Some(itag) && f["url"].as_str().is_some())
+            .max_by_key(|f| xtags_priority_score(f, preferred_lang))?;
+        let number = |key: &str| {
+            format[key]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .or_else(|| format[key].as_u64())
+                .unwrap_or(0)
+        };
+        let (mime_type, codecs) = parse_mime_and_codecs(format["mimeType"].as_str().unwrap_or(""));
         Some(Stream {
             url: format["url"].as_str()?.to_owned(),
             len: number("contentLength"),
             duration_ms: number("approxDurationMs"),
             opus: itag == OPUS_ITAG || itag == 250,
             loudness_db,
+            itag,
+            mime_type,
+            codecs,
+            bitrate: number("bitrate"),
+            sample_rate: number("audioSampleRate") as u32,
+            expires_in_seconds,
             fallback: None,
         })
     };
@@ -950,6 +1033,93 @@ fn audio_with_quality(response: &Value, low_quality: bool) -> Option<Stream> {
         }),
         None => aac,
     }
+}
+
+/// Per-client health and failure cooldown tracker.
+struct ClientHealthTracker {
+    entries: Mutex<std::collections::HashMap<String, (u32, Option<std::time::Instant>)>>,
+}
+
+impl ClientHealthTracker {
+    fn new() -> Self {
+        Self {
+            entries: Mutex::new(std::collections::HashMap::new()),
+        }
+    }
+
+    fn record_success(&self, client: &str) {
+        if let Ok(mut map) = self.entries.lock() {
+            map.insert(client.to_string(), (0, None));
+        }
+    }
+
+    fn record_failure(&self, client: &str) {
+        if let Ok(mut map) = self.entries.lock() {
+            let count = map.get(client).map(|(c, _)| *c + 1).unwrap_or(1);
+            let cooldown_secs = (15 * (1_u64 << count.min(4))).min(300);
+            let until = std::time::Instant::now() + std::time::Duration::from_secs(cooldown_secs);
+            map.insert(client.to_string(), (count, Some(until)));
+        }
+    }
+
+    fn is_in_cooldown(&self, client: &str) -> bool {
+        if let Ok(map) = self.entries.lock() {
+            if let Some((_, Some(until))) = map.get(client) {
+                return std::time::Instant::now() < *until;
+            }
+        }
+        false
+    }
+}
+
+fn client_health() -> &'static ClientHealthTracker {
+    static TRACKER: std::sync::OnceLock<ClientHealthTracker> = std::sync::OnceLock::new();
+    TRACKER.get_or_init(ClientHealthTracker::new)
+}
+
+/// Single-flight coalescing for concurrent stream resolutions of the same `video_id`.
+struct StreamCoalescer {
+    in_flight: Mutex<std::collections::HashMap<String, Option<Result<Stream, String>>>>,
+    condvar: std::sync::Condvar,
+}
+
+impl StreamCoalescer {
+    fn new() -> Self {
+        Self {
+            in_flight: Mutex::new(std::collections::HashMap::new()),
+            condvar: std::sync::Condvar::new(),
+        }
+    }
+
+    fn resolve<F>(&self, key: &str, work: F) -> Result<Stream, String>
+    where
+        F: FnOnce() -> Result<Stream, String>,
+    {
+        let mut guard = self.in_flight.lock().unwrap();
+        if guard.contains_key(key) {
+            while let Some(slot) = guard.get(key) {
+                if let Some(res) = slot {
+                    return res.clone();
+                }
+                guard = self.condvar.wait(guard).unwrap();
+            }
+        }
+        guard.insert(key.to_string(), None);
+        drop(guard);
+
+        let result = work();
+
+        let mut guard = self.in_flight.lock().unwrap();
+        guard.insert(key.to_string(), Some(result.clone()));
+        self.condvar.notify_all();
+        guard.remove(key);
+        result
+    }
+}
+
+fn stream_coalescer() -> &'static StreamCoalescer {
+    static COALESCER: std::sync::OnceLock<StreamCoalescer> = std::sync::OnceLock::new();
+    COALESCER.get_or_init(StreamCoalescer::new)
 }
 
 fn describe(error: ureq::Error) -> String {
@@ -1684,5 +1854,33 @@ mod tests {
         );
         assert_eq!(song("(Official Video)", "Someone"), pair("(Official Video)", "Someone"));
         assert_eq!(song("Çağrı (Lyric Video)", "Şehinşah"), pair("Çağrı", "Şehinşah"));
+    }
+
+    #[test]
+    fn xtags_prefers_original_over_dubbed_and_respects_preferred_language() {
+        let dubbed = json!({ "itag": 251, "url": "https://example.com/dub", "xtags": "acont=dubbed:lang=es" });
+        let original = json!({ "itag": 251, "url": "https://example.com/orig", "xtags": "acont=original:lang=en" });
+        let resp = json!({
+            "playabilityStatus": { "status": "OK" },
+            "streamingData": { "expiresInSeconds": "21600", "adaptiveFormats": [dubbed, original] }
+        });
+
+        let picked = audio_with_preferences(&resp, false, "").unwrap();
+        assert_eq!(picked.url, "https://example.com/orig");
+        assert_eq!(picked.itag, 251);
+        assert_eq!(picked.expires_in_seconds, 21600);
+
+        let picked_es = audio_with_preferences(&resp, false, "es").unwrap();
+        assert_eq!(picked_es.url, "https://example.com/dub");
+    }
+
+    #[test]
+    fn client_health_tracker_applies_cooldown_and_clears_on_success() {
+        let tracker = ClientHealthTracker::new();
+        assert!(!tracker.is_in_cooldown("player"));
+        tracker.record_failure("player");
+        assert!(tracker.is_in_cooldown("player"));
+        tracker.record_success("player");
+        assert!(!tracker.is_in_cooldown("player"));
     }
 }

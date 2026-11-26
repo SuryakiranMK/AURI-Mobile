@@ -6,13 +6,21 @@ import com.auri.music.model.LyricsLine
 import com.auri.music.model.Song
 import org.json.JSONArray
 import org.json.JSONObject
+import java.nio.ByteBuffer
 
 data class ResolvedStream(
     val url: String,
     val durationMs: Long,
     val isOpus: Boolean,
     val loudnessDb: Double?,
-    val audioQuality: String
+    val audioQuality: String,
+    val itag: Int = 0,
+    val mimeType: String = "",
+    val codecs: String = "",
+    val bitrate: Long = 0L,
+    val sampleRate: Int = 48000,
+    val contentLength: Long = 0L,
+    val expiresInSeconds: Long = 21600L
 )
 
 object AuriNativeEngine {
@@ -63,7 +71,69 @@ object AuriNativeEngine {
     external fun nativeCalculateLoudnessGain(loudnessDb: Double): Double
     external fun nativeSearch(query: String): String
     external fun nativeResolveStream(videoId: String): String
+    external fun nativeResolveStreamWithLang(videoId: String, preferredLang: String): String
     external fun nativeGetLyrics(videoId: String, title: String, artist: String, durationSec: Long): String
+    external fun nativeDspCreate(sampleRate: Int): Long
+    external fun nativeDspDestroy(handle: Long)
+    external fun nativeDspReset(handle: Long)
+    external fun nativeDspConfigure(
+        handle: Long,
+        eqGains: FloatArray,
+        preampDb: Float,
+        autoHeadroom: Boolean,
+        loudnessGainDb: Double,
+        normalizerEnabled: Boolean
+    )
+    external fun nativeDspProcessPcm16(
+        handle: Long,
+        directBuf: ByteBuffer,
+        byteOffset: Int,
+        byteLen: Int,
+        channels: Int,
+        sampleRate: Int
+    )
+    external fun nativeDspProcessPcmFloat(
+        handle: Long,
+        directBuf: ByteBuffer,
+        byteOffset: Int,
+        byteLen: Int,
+        channels: Int,
+        sampleRate: Int
+    )
+
+    fun dspCreate(sampleRate: Int): Long = if (isLoaded) try { nativeDspCreate(sampleRate) } catch (_: Throwable) { 0L } else 0L
+    fun dspDestroy(handle: Long) { if (isLoaded && handle != 0L) try { nativeDspDestroy(handle) } catch (_: Throwable) {} }
+    fun dspReset(handle: Long) { if (isLoaded && handle != 0L) try { nativeDspReset(handle) } catch (_: Throwable) {} }
+    fun dspConfigure(
+        handle: Long,
+        eqGains: FloatArray,
+        preampDb: Float,
+        autoHeadroom: Boolean,
+        loudnessGainDb: Double,
+        normalizerEnabled: Boolean
+    ) {
+        if (isLoaded && handle != 0L) {
+            try {
+                nativeDspConfigure(handle, eqGains, preampDb, autoHeadroom, loudnessGainDb, normalizerEnabled)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun dspProcessPcm16(handle: Long, buf: ByteBuffer, offset: Int, len: Int, channels: Int, sampleRate: Int) {
+        if (isLoaded && handle != 0L && buf.isDirect) {
+            try {
+                nativeDspProcessPcm16(handle, buf, offset, len, channels, sampleRate)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun dspProcessPcmFloat(handle: Long, buf: ByteBuffer, offset: Int, len: Int, channels: Int, sampleRate: Int) {
+        if (isLoaded && handle != 0L && buf.isDirect) {
+            try {
+                nativeDspProcessPcmFloat(handle, buf, offset, len, channels, sampleRate)
+            } catch (_: Throwable) {}
+        }
+    }
 
     fun getVersion(): String {
         return if (isLoaded) {
@@ -132,10 +202,14 @@ object AuriNativeEngine {
         }
     }
 
-    fun resolveStream(videoId: String): ResolvedStream? {
+    fun resolveStream(videoId: String, preferredLang: String = ""): ResolvedStream? {
         if (!isLoaded) return null
         return try {
-            val jsonStr = nativeResolveStream(videoId)
+            val jsonStr = if (preferredLang.isBlank()) {
+                nativeResolveStream(videoId)
+            } else {
+                nativeResolveStreamWithLang(videoId, preferredLang)
+            }
             val obj = JSONObject(jsonStr)
             if (obj.has("url")) {
                 ResolvedStream(
@@ -143,7 +217,14 @@ object AuriNativeEngine {
                     durationMs = obj.optLong("duration_ms", 0L),
                     isOpus = obj.optBoolean("is_opus", true),
                     loudnessDb = if (obj.has("loudness_db") && !obj.isNull("loudness_db")) obj.getDouble("loudness_db") else null,
-                    audioQuality = obj.optString("audio_quality", "OPUS 160 kbps • 48 kHz")
+                    audioQuality = obj.optString("audio_quality", "OPUS 160 kbps • 48 kHz"),
+                    itag = obj.optInt("itag", 0),
+                    mimeType = obj.optString("mime_type", ""),
+                    codecs = obj.optString("codecs", ""),
+                    bitrate = obj.optLong("bitrate", 0L),
+                    sampleRate = obj.optInt("sample_rate", 48000),
+                    contentLength = obj.optLong("content_length", 0L),
+                    expiresInSeconds = obj.optLong("expires_in_seconds", 21600L)
                 )
             } else {
                 null
