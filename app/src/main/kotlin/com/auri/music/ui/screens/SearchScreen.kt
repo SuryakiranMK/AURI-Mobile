@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.auri.music.model.Song
+import com.auri.music.ui.components.SongRowItem
 import com.auri.music.ui.theme.AuriGlassBorder
 import com.auri.music.ui.theme.AuriGlassSurface
 import com.auri.music.ui.theme.AuriObsidianBackground
