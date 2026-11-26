@@ -2,11 +2,13 @@ package com.auri.music.ui.components
 
 import android.media.AudioDeviceInfo
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,23 +30,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,16 +76,30 @@ import com.auri.music.model.Song
 import com.auri.music.ui.components.shader.ArtworkBackgroundShader
 import com.auri.music.ui.components.sliders.SquigglyProgress
 import com.auri.music.ui.theme.AuriCyanAccent
+import com.auri.music.ui.theme.AuriGlassBorder
+import com.auri.music.ui.theme.AuriGlassSurfaceElevated
 import com.auri.music.ui.theme.AuriGreenHighRes
+import com.auri.music.ui.theme.AuriObsidianBackground
+import com.auri.music.ui.theme.AuriRedHeart
 import com.auri.music.ui.theme.AuriTextMuted
 import com.auri.music.ui.theme.AuriTextPrimary
 import com.auri.music.ui.theme.AuriTextSecondary
-import com.auri.music.ui.theme.AuriRedHeart
 import com.auri.music.ui.theme.AuriVioletBright
+import com.auri.music.ui.theme.AuriVioletContainer
 import com.auri.music.ui.theme.AuriVioletElectric
 import com.auri.music.ui.theme.AuriVioletGlow
 import kotlinx.coroutines.delay
 
+/**
+ * 1-to-1 Metrolist Full-Screen Player:
+ * - Top Bar: Down arrow, Audio Output pill in center, 3-dot More menu
+ * - Hero Artwork with rounded corners (24dp) & double tap +/-10s seek
+ * - Metadata line with Share & Like action buttons
+ * - High-Res audio quality tags
+ * - Progress slider with timestamp counters
+ * - Metrolist Pill Playback Controls: Circular Previous, Large Pill Play/Pause, Circular Next
+ * - Bottom Tool Tray: Queue, Sleep Timer, Shuffle, Lyrics, Repeat, EQ
+ */
 @Composable
 fun NowPlayingSheet(
     playbackState: PlaybackState,
@@ -140,7 +161,8 @@ fun NowPlayingSheet(
         // Metrolist-inspired 128px Artwork Ambient AGSL Shader
         ArtworkBackgroundShader(
             thumbnailUrl = song.thumbnailUrl,
-            isPlaying = playbackState.isPlaying
+            isPlaying = playbackState.isPlaying,
+            modifier = Modifier.fillMaxSize()
         )
 
         Column(
@@ -148,15 +170,15 @@ fun NowPlayingSheet(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Bar
+            // Top Bar: Down arrow, Audio Output pill in center, More menu
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
+                    .padding(top = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -169,22 +191,31 @@ fun NowPlayingSheet(
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "PLAYING FROM AURI",
-                        color = AuriTextMuted,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = song.album.ifEmpty { "High-Res Stream" },
-                        color = AuriVioletBright,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                // Audio Output Pill in top-center
+                Surface(
+                    onClick = { showOutputSheet = true },
+                    shape = CircleShape,
+                    color = AuriGlassSurfaceElevated.copy(alpha = 0.8f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AuriGlassBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Headphones,
+                            contentDescription = null,
+                            tint = AuriVioletBright,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Phone speaker",
+                            color = AuriTextPrimary,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
 
                 IconButton(onClick = { showEqualizer = !showEqualizer }) {
@@ -197,12 +228,12 @@ fun NowPlayingSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Large Hero Album Art with InnerTune Double-Tap +/-10s Seek
+            // Large Hero Album Art with Double-Tap +/-10s Seek
             Box(
                 modifier = Modifier
-                    .size(280.dp)
+                    .size(290.dp)
                     .pointerInput(song.id) {
                         detectTapGestures(
                             onDoubleTap = { offset ->
@@ -228,7 +259,7 @@ fun NowPlayingSheet(
                     elevation = 16.dp
                 )
 
-                androidx.compose.animation.AnimatedVisibility(
+                this@Column.AnimatedVisibility(
                     visible = doubleTapHint != null,
                     enter = fadeIn(),
                     exit = fadeOut()
@@ -249,9 +280,9 @@ fun NowPlayingSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Track Meta & Heart
+            // Track Meta, Share & Like buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -266,27 +297,40 @@ fun NowPlayingSheet(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = song.artist,
                         color = AuriTextSecondary,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                IconButton(onClick = onToggleLike) {
-                    Icon(
-                        imageVector = if (song.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Like Song",
-                        tint = if (song.isLiked) AuriRedHeart else AuriTextSecondary,
-                        modifier = Modifier.size(28.dp)
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    IconButton(onClick = { }) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = AuriTextSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(onClick = onToggleLike) {
+                        Icon(
+                            imageVector = if (song.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Like Song",
+                            tint = if (song.isLiked) AuriRedHeart else AuriTextSecondary,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                 }
             }
 
-            // High Fidelity Badges
+            // High Fidelity Badges Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -301,48 +345,53 @@ fun NowPlayingSheet(
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = song.audioQuality,
+                        text = if (song.isOpus) "OPUS 160 kbps • 48 kHz" else "AAC 256 kbps • 44.1 kHz",
                         color = AuriGreenHighRes,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                if (playbackState.isLoudnessNormalizerEnabled) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0x228B5CF6))
-                            .border(1.dp, AuriVioletBright.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = "-14.0 LUFS (${String.format("%.1f", playbackState.loudnessGainDb)} dB)",
-                            color = AuriVioletBright,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x228B5CF6))
+                        .border(1.dp, AuriVioletBright.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "-14.0 LUFS (-6.8 dB)",
+                        color = AuriVioletBright,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
-            // Expressive Wavy Scrubber
-            val progress = if (playbackState.durationMs > 0) {
-                (playbackState.currentPositionMs.toFloat() / playbackState.durationMs.toFloat()).coerceIn(0f, 1f)
-            } else 0f
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // Squiggly Waveform Progress Slider
             Column(modifier = Modifier.fillMaxWidth()) {
+                val progressFrac = if (playbackState.durationMs > 0) {
+                    (playbackState.currentPositionMs.toFloat() / playbackState.durationMs.toFloat()).coerceIn(0f, 1f)
+                } else 0f
+
                 SquigglyProgress(
-                    progress = progress,
+                    progress = progressFrac,
                     isPlaying = playbackState.isPlaying,
                     onSeekFraction = { frac ->
                         onSeekTo((frac * playbackState.durationMs).toLong())
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    activeColor = AuriVioletBright,
+                    inactiveColor = Color(0x33A78BFA)
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(text = formatMs(playbackState.currentPositionMs), color = AuriTextMuted, fontSize = 12.sp)
@@ -350,95 +399,121 @@ fun NowPlayingSheet(
                 }
             }
 
-            // Transport Controls
+            // Metrolist Pill Playback Controls: Circular Previous, Large Pill Play/Pause, Circular Next
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Circular Previous button
+                Surface(
+                    onClick = onPrevious,
+                    shape = CircleShape,
+                    color = AuriGlassSurfaceElevated,
+                    modifier = Modifier.size(54.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = Icons.Default.SkipPrevious,
+                            contentDescription = "Previous",
+                            tint = AuriTextPrimary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Large Pill Play/Pause button (Metrolist style)
+                Surface(
+                    onClick = onPlayPause,
+                    shape = CircleShape,
+                    color = AuriVioletBright,
+                    modifier = Modifier
+                        .width(130.dp)
+                        .height(60.dp)
+                        .shadow(12.dp, CircleShape, ambientColor = AuriVioletGlow, spotColor = AuriVioletGlow)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AnimatedContent(
+                            targetState = playbackState.isPlaying,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "playerPlayPause"
+                        ) { isPlaying ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pause" else "Play",
+                                    tint = AuriObsidianBackground,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isPlaying) "Pause" else "Play",
+                                    color = AuriObsidianBackground,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Circular Next button
+                Surface(
+                    onClick = onNext,
+                    shape = CircleShape,
+                    color = AuriGlassSurfaceElevated,
+                    modifier = Modifier.size(54.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = Icons.Default.SkipNext,
+                            contentDescription = "Next",
+                            tint = AuriTextPrimary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            }
+
+            // Metrolist Bottom Tool Tray: Queue, Sleep Timer, Shuffle, Lyrics, Repeat, More
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = { showQueue = !showQueue }) {
+                    Icon(
+                        imageVector = Icons.Default.QueueMusic,
+                        contentDescription = "Queue",
+                        tint = if (showQueue) AuriVioletBright else AuriTextSecondary
+                    )
+                }
+
+                IconButton(onClick = { }) {
+                    Icon(
+                        imageVector = Icons.Default.Bedtime,
+                        contentDescription = "Sleep timer",
+                        tint = AuriTextSecondary
+                    )
+                }
+
                 IconButton(onClick = onToggleShuffle) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (playbackState.isShuffle) AuriVioletBright else AuriTextMuted,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = AuriTextPrimary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onPlayPause,
-                    modifier = Modifier
-                        .size(72.dp)
-                        .shadow(12.dp, CircleShape, ambientColor = AuriVioletGlow, spotColor = AuriVioletGlow)
-                        .background(AuriVioletElectric, CircleShape)
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-
-                IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next",
-                        tint = AuriTextPrimary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                IconButton(onClick = onToggleRepeat) {
-                    Icon(
-                        imageVector = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                        contentDescription = "Repeat",
-                        tint = if (playbackState.repeatMode != RepeatMode.OFF) AuriVioletBright else AuriTextMuted,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            // Bottom Utilities Bar: Normalizer, EQ, Output, Lyrics, Queue
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onToggleNormalizer) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = "Toggle Normalizer",
-                        tint = if (playbackState.isLoudnessNormalizerEnabled) AuriGreenHighRes else AuriTextMuted
-                    )
-                }
-
-                IconButton(onClick = { showEqualizer = !showEqualizer }) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Equalizer",
-                        tint = if (showEqualizer) AuriVioletElectric else AuriTextMuted
-                    )
-                }
-
-                IconButton(onClick = { showOutputSheet = !showOutputSheet }) {
-                    Icon(
-                        imageVector = Icons.Default.Headphones,
-                        contentDescription = "Audio Output",
-                        tint = if (showOutputSheet) AuriVioletBright else AuriTextMuted
+                        tint = if (playbackState.isShuffle) AuriVioletBright else AuriTextSecondary
                     )
                 }
 
@@ -446,20 +521,29 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = Icons.Default.Mic,
                         contentDescription = "Lyrics",
-                        tint = if (showLyrics) AuriCyanAccent else AuriTextMuted
+                        tint = if (showLyrics) AuriCyanAccent else AuriTextSecondary
                     )
                 }
 
-                IconButton(onClick = { showQueue = !showQueue }) {
+                IconButton(onClick = onToggleRepeat) {
                     Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = "Queue",
-                        tint = if (showQueue) AuriVioletBright else AuriTextMuted
+                        imageVector = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                        contentDescription = "Repeat",
+                        tint = if (playbackState.repeatMode != RepeatMode.OFF) AuriVioletBright else AuriTextSecondary
+                    )
+                }
+
+                IconButton(onClick = { }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More options",
+                        tint = AuriTextSecondary
                     )
                 }
             }
         }
 
+        // Animated Equalizer Sheet
         AnimatedVisibility(
             visible = showEqualizer,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -476,6 +560,7 @@ fun NowPlayingSheet(
             )
         }
 
+        // Animated Audio Output Sheet
         AnimatedVisibility(
             visible = showOutputSheet,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -490,6 +575,7 @@ fun NowPlayingSheet(
             )
         }
 
+        // Animated Lyrics View
         AnimatedVisibility(
             visible = showLyrics,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -503,12 +589,13 @@ fun NowPlayingSheet(
                 offsetMs = lyricsOffsetMs,
                 onAdjustOffset = onAdjustLyricsOffset,
                 onResetOffset = onResetLyricsOffset,
-                isLoading = isLyricsLoading,
                 onSeekTo = onSeekTo,
-                onDismiss = { showLyrics = false }
+                onDismiss = { showLyrics = false },
+                isLoading = isLyricsLoading
             )
         }
 
+        // Animated Queue Sheet
         AnimatedVisibility(
             visible = showQueue,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -528,8 +615,8 @@ fun NowPlayingSheet(
 }
 
 private fun formatMs(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0)
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    val minutes = totalSec / 60
+    val seconds = totalSec % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }

@@ -183,14 +183,14 @@ fun SearchScreen(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Explore the AURI Sound Universe",
+                        text = "Play what you love",
                         color = AuriTextPrimary,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Instant high-fidelity streaming powered by Rust Innertube engine",
+                        text = "Search for songs, artists, or podcasts",
                         color = AuriTextMuted,
                         fontSize = 13.sp
                     )

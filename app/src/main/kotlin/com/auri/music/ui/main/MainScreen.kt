@@ -34,23 +34,23 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
-import com.auri.music.ui.components.ExpressiveMiniPlayerHeight
+import com.auri.music.ui.components.MetrolistMiniPlayerHeight
 import com.auri.music.ui.components.MiniPlayer
 import com.auri.music.ui.components.MorphingPlayerSheet
 import com.auri.music.ui.components.NowPlayingSheet
 import com.auri.music.ui.components.rememberAuriBottomSheetState
-import com.auri.music.ui.navigation.FloatingNavItem
-import com.auri.music.ui.navigation.MetrolistFloatingNavigation
+import com.auri.music.ui.navigation.MetrolistBarTab
+import com.auri.music.ui.navigation.MetrolistNavigationBar
 import com.auri.music.ui.screens.HomeScreen
 import com.auri.music.ui.screens.LibraryScreen
 import com.auri.music.ui.screens.SearchScreen
 import com.auri.music.ui.theme.AuriObsidianBackground
 
 /**
- * Main application shell featuring Metrolist UI foundations:
- * - Floating capsule navigation bar with fluid spring physics
- * - Expressive MiniPlayer floating above navigation
- * - Morphing PlayerSheet transitioning seamlessly to full-bleed NowPlayingSheet
+ * Main application shell featuring exact Metrolist UI foundations:
+ * - Metrolist 3-tab Bottom Navigation Bar (Home, Search, Library)
+ * - Metrolist Expressive MiniPlayer floating above bottom navigation
+ * - Smooth morphing transition into full-screen Metrolist NowPlayingSheet
  */
 @Composable
 fun MainScreen(
@@ -73,14 +73,12 @@ fun MainScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val playerSheetState = rememberAuriBottomSheetState()
 
-    val navItems = remember {
+    val tabs = remember {
         listOf(
-            FloatingNavItem(0, "Home", Icons.Outlined.Home, Icons.Filled.Home),
-            FloatingNavItem(2, "Library", Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic)
+            MetrolistBarTab(0, "Home", Icons.Filled.Home, Icons.Outlined.Home),
+            MetrolistBarTab(1, "Search", Icons.Filled.Search, Icons.Outlined.Search),
+            MetrolistBarTab(2, "Library", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic)
         )
-    }
-    val searchItem = remember {
-        FloatingNavItem(1, "Search", Icons.Outlined.Search, Icons.Filled.Search)
     }
 
     BoxWithConstraints(
@@ -90,14 +88,14 @@ fun MainScreen(
     ) {
         val maxSheetHeight = maxHeight
         val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val navBarTotalHeight = 72.dp + navBarPadding
+        val navBarTotalHeight = 70.dp + navBarPadding
         val navAlpha = (1f - playerSheetState.progress * 1.5f).coerceIn(0f, 1f)
 
-        // Screen Content (under floating navigation)
+        // Screen Content (under persistent navigation & miniplayer)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = if (playbackState.currentSong != null) 70.dp else 10.dp)
+                .padding(bottom = if (playbackState.currentSong != null) 72.dp else 0.dp)
         ) {
             when (selectedTab) {
                 0 -> HomeScreen(
@@ -126,21 +124,18 @@ fun MainScreen(
             }
         }
 
-        // Metrolist Floating Capsule Navigation
+        // Metrolist 3-Tab Bottom Navigation Bar
         if (navAlpha > 0.01f) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .alpha(navAlpha),
-                contentAlignment = Alignment.Center
+                    .alpha(navAlpha)
             ) {
-                MetrolistFloatingNavigation(
-                    items = navItems,
-                    selectedIndex = selectedTab,
-                    onSelect = { selectedTab = it },
-                    separateSearchItem = searchItem
+                MetrolistNavigationBar(
+                    tabs = tabs,
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it }
                 )
             }
         }
@@ -149,7 +144,7 @@ fun MainScreen(
         MorphingPlayerSheet(
             visible = playbackState.currentSong != null,
             state = playerSheetState,
-            collapsedHeight = ExpressiveMiniPlayerHeight + 8.dp,
+            collapsedHeight = MetrolistMiniPlayerHeight + 6.dp,
             bottomNavHeight = navBarTotalHeight,
             maxHeight = maxSheetHeight,
             collapsedContent = {

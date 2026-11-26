@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,9 +27,15 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -66,11 +73,12 @@ import com.auri.music.ui.theme.AuriVioletContainer
 import com.auri.music.ui.theme.AuriVioletElectric
 
 /**
- * Metrolist-Styled Home Screen:
- * - Clean Brand Header with Rust Status pill
- * - Metrolist Filter Chip Shelf (capsule pills with spring animations)
- * - 2x2 Speed Dial Quick Access Cards
- * - Metrolist Horizontal Multi-Browse Carousels (Quick Picks, Keep Listening, Forgotten Favorites, Trending)
+ * 1-to-1 Metrolist Home Screen Layout:
+ * - Top bar: "Home" title + History, People/Listen Together, Profile Avatar icons
+ * - Metrolist Filter Chip Shelf (capsule pills: Podcasts, Workout, Feel good, Energize, Romance, Relax)
+ * - 3x3 Speed Dial Carousel with page indicators
+ * - Quick Picks horizontal shelf with cards
+ * - Keep Listening & Trending now lists
  */
 @Composable
 fun HomeScreen(
@@ -96,85 +104,56 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .background(AuriObsidianBackground),
-        contentPadding = PaddingValues(bottom = 120.dp)
+        contentPadding = PaddingValues(bottom = 140.dp)
     ) {
-        // App Branding Top Bar
+        // Metrolist Top Bar: Home title on left, Action Icons on right
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_auri_brand),
-                        contentDescription = "AURI Logo",
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "AURI",
+                        text = "Home",
                         color = AuriTextPrimary,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "MOBILE",
-                        color = AuriVioletBright,
-                        fontSize = 12.sp,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
+                        letterSpacing = (-0.5).sp
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color(0x2210B981))
-                        .border(1.dp, AuriGreenHighRes.copy(alpha = 0.4f), CircleShape)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Wifi,
-                            contentDescription = "Rust Engine",
-                            tint = AuriGreenHighRes,
-                            modifier = Modifier.size(11.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "RUST DSP",
-                            color = AuriGreenHighRes,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { }) {
+                        Icon(Icons.Default.History, contentDescription = "History", tint = AuriTextPrimary)
+                    }
+                    IconButton(onClick = { }) {
+                        Icon(Icons.Default.People, contentDescription = "Listen Together", tint = AuriTextPrimary)
+                    }
+                    IconButton(onClick = { }) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = AuriTextPrimary)
                     }
                 }
             }
         }
 
-        // Metrolist Chip Shelf
+        // Metrolist Filter Chips Shelf
         item {
+            val filterChips = remember {
+                listOf("Podcasts", "Workout", "Feel good", "Energize", "Romance", "Relax")
+            }
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(categories) { category ->
-                    val isSelected = category == selectedCategory
+                items(filterChips) { chip ->
+                    val isSelected = chip == selectedCategory
                     val chipBg by animateColorAsState(
                         targetValue = if (isSelected) AuriVioletContainer else AuriGlassSurfaceElevated,
                         animationSpec = spring(dampingRatio = 0.9f, stiffness = 700f),
                         label = "homeChipBg"
-                    )
-                    val chipBorder by animateColorAsState(
-                        targetValue = if (isSelected) AuriVioletBright.copy(alpha = 0.6f) else AuriGlassBorder,
-                        label = "homeChipBorder"
                     )
                     val chipText by animateColorAsState(
                         targetValue = if (isSelected) AuriVioletBright else AuriTextSecondary,
@@ -183,12 +162,18 @@ fun HomeScreen(
 
                     Surface(
                         modifier = Modifier
-                            .height(36.dp)
+                            .height(38.dp)
                             .clip(CircleShape)
-                            .border(1.dp, chipBorder, CircleShape)
+                            .border(
+                                1.dp,
+                                if (isSelected) AuriVioletBright.copy(alpha = 0.6f) else AuriGlassBorder,
+                                CircleShape
+                            )
                             .selectable(
                                 selected = isSelected,
-                                onClick = { selectedCategory = category },
+                                onClick = {
+                                    selectedCategory = if (isSelected) "All" else chip
+                                },
                                 role = Role.Tab,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(bounded = true, color = AuriVioletBright)
@@ -201,185 +186,174 @@ fun HomeScreen(
                             modifier = Modifier.padding(horizontal = 16.dp)
                         ) {
                             Text(
-                                text = category,
+                                text = chip,
                                 color = chipText,
                                 fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                             )
                         }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(18.dp))
         }
 
-        // Metrolist Speed Dial (2x2 Grid)
+        // Metrolist Speed Dial (3x3 Grid Carousel)
         if (quickPicks.isNotEmpty()) {
             item {
-                Text(
-                    text = "Speed Dial",
-                    color = AuriTextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Speed dial",
+                        color = AuriTextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        onClick = { onSongClick(quickPicks.first(), quickPicks) },
+                        shape = CircleShape,
+                        color = AuriVioletContainer,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "Play all",
+                                tint = AuriVioletBright,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
 
-                val speedPicks = quickPicks.take(4)
+                // 3x3 Grid
+                val dialItems = quickPicks.take(9)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    speedPicks.chunked(2).forEach { rowSongs ->
+                    dialItems.chunked(3).forEach { rowSongs ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             rowSongs.forEach { song ->
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(60.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(1.dp, AuriGlassBorder, RoundedCornerShape(12.dp))
-                                        .clickable { onSongClick(song, quickPicks) },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = AuriGlassSurfaceElevated
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        AlbumArt(
-                                            thumbnailUrl = song.thumbnailUrl,
-                                            contentDescription = song.title,
-                                            modifier = Modifier.size(60.dp),
-                                            cornerRadius = 0.dp
-                                        )
-                                        Column(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .padding(horizontal = 10.dp)
-                                        ) {
-                                            Text(
-                                                text = song.title,
-                                                color = AuriTextPrimary,
-                                                fontSize = 12.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = song.artist,
-                                                color = AuriTextSecondary,
-                                                fontSize = 11.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
+                                MetrolistSpeedDialCard(
+                                    song = song,
+                                    onClick = { onSongClick(song, quickPicks) },
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
-                            if (rowSongs.size == 1) {
+                            // Fill remaining space if less than 3 in row
+                            repeat(3 - rowSongs.size) {
                                 Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(18.dp))
+
+                // Carousel Dots Indicator
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, bottom = 18.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(AuriVioletBright)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(AuriTextMuted.copy(alpha = 0.4f))
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(AuriTextMuted.copy(alpha = 0.4f))
+                    )
+                }
             }
         }
 
-        // Quick Picks Shelf
+        // Quick picks Shelf
         item {
             Text(
-                text = "Quick Picks",
+                text = "Quick picks",
                 color = AuriTextPrimary,
-                fontSize = 20.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
             )
 
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 18.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 items(quickPicks) { song ->
-                    MetrolistCard(
+                    MetrolistCarouselCard(
                         song = song,
                         onClick = { onSongClick(song, quickPicks) }
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
 
         // Keep Listening Shelf
         if (keepListening.isNotEmpty()) {
             item {
                 Text(
-                    text = "Keep Listening",
+                    text = "Keep listening",
                     color = AuriTextPrimary,
-                    fontSize = 20.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
                 )
 
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     items(keepListening) { song ->
-                        MetrolistCard(
+                        MetrolistCarouselCard(
                             song = song,
                             onClick = { onSongClick(song, keepListening) }
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(18.dp))
-            }
-        }
-
-        // Forgotten Favorites Shelf
-        if (forgottenFavorites.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Forgotten Favorites",
-                    color = AuriTextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-                )
-
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    items(forgottenFavorites) { song ->
-                        MetrolistCard(
-                            song = song,
-                            onClick = { onSongClick(song, forgottenFavorites) }
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
 
         // Trending Now Section
         item {
             Text(
-                text = "Trending Now",
+                text = "Trending now",
                 color = AuriTextPrimary,
-                fontSize = 20.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
         }
 
         items(displayedSongs) { song ->
-            MetrolistSongRow(
+            MetrolistSongRowItem(
                 song = song,
                 onClick = { onSongClick(song, displayedSongs) }
             )
@@ -387,44 +361,104 @@ fun HomeScreen(
     }
 }
 
+/**
+ * 3x3 Speed Dial Card matching Metrolist:
+ * - Square card with rounded corners (16dp)
+ * - Album artwork filling the card
+ * - Dark gradient scrim at the bottom with title
+ */
 @Composable
-private fun MetrolistCard(
+private fun MetrolistSpeedDialCard(
     song: Song,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = Modifier
-            .width(140.dp)
-            .clickable(onClick = onClick)
+    Surface(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, AuriGlassBorder, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = AuriGlassSurfaceElevated
     ) {
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, AuriGlassBorder, RoundedCornerShape(16.dp))
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             AlbumArt(
                 thumbnailUrl = song.thumbnailUrl,
                 contentDescription = song.title,
                 modifier = Modifier.fillMaxSize(),
                 cornerRadius = 16.dp
             )
+
+            // Bottom gradient overlay for title legibility
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color(0xDD08080B))
+                        )
+                    )
+            )
+
+            Text(
+                text = song.title,
+                color = AuriTextPrimary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Quick picks horizontal carousel card matching Metrolist
+ */
+@Composable
+private fun MetrolistCarouselCard(
+    song: Song,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(148.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(148.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .border(1.dp, AuriGlassBorder, RoundedCornerShape(18.dp))
+        ) {
+            AlbumArt(
+                thumbnailUrl = song.thumbnailUrl,
+                contentDescription = song.title,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = 18.dp
+            )
             // Play overlay circle
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(8.dp)
-                    .size(32.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
-                    .background(AuriVioletContainer)
-                    .border(1.dp, AuriVioletBright.copy(alpha = 0.5f), CircleShape),
+                    .background(AuriVioletBright)
+                    .border(1.dp, AuriVioletBright, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = "Play",
-                    tint = AuriVioletBright,
-                    modifier = Modifier.size(18.dp)
+                    tint = AuriObsidianBackground,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -440,22 +474,25 @@ private fun MetrolistCard(
         Text(
             text = song.artist,
             color = AuriTextSecondary,
-            fontSize = 12.sp,
+            fontSize = 11.5.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
 
+/**
+ * Metrolist Song Row with 3-dot options menu
+ */
 @Composable
-private fun MetrolistSongRow(
+private fun MetrolistSongRowItem(
     song: Song,
     onClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 3.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
@@ -464,13 +501,13 @@ private fun MetrolistSongRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AlbumArt(
                 thumbnailUrl = song.thumbnailUrl,
                 contentDescription = song.title,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(50.dp),
                 cornerRadius = 10.dp
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -483,7 +520,10 @@ private fun MetrolistSongRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
                     Text(
                         text = song.artist,
                         color = AuriTextSecondary,
@@ -504,12 +544,14 @@ private fun MetrolistSongRow(
                     )
                 }
             }
-            Text(
-                text = "${(song.durationMs / 1000) / 60}:${((song.durationMs / 1000) % 60).toString().padStart(2, '0')}",
-                color = AuriTextMuted,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(start = 8.dp)
-            )
+            IconButton(onClick = { }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = AuriTextMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
