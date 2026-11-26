@@ -60,7 +60,9 @@ fun HomeScreen(
     trending: List<Song>,
     categories: List<String>,
     onSongClick: (Song, List<Song>) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    keepListening: List<Song> = emptyList(),
+    forgottenFavorites: List<Song> = emptyList()
 ) {
     var selectedCategory by remember { mutableStateOf(categories.firstOrNull() ?: "All") }
     val displayedSongs = remember(selectedCategory, trending) {
@@ -76,7 +78,7 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .background(AuriObsidianBackground),
-        contentPadding = PaddingValues(bottom = 100.dp)
+        contentPadding = PaddingValues(bottom = 110.dp)
     ) {
         // App Branding Top Bar
         item {
@@ -113,7 +115,6 @@ fun HomeScreen(
                     )
                 }
 
-                // Rust Engine Active Pill
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
@@ -172,7 +173,44 @@ fun HomeScreen(
             }
         }
 
-        // Quick Picks Carousel Header
+        // Metrolist Speed Dial Compact 2-Column Quick Access Grid
+        if (quickPicks.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Speed dial",
+                    color = AuriTextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val pairs = quickPicks.take(4).chunked(2)
+                    for (pair in pairs) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (song in pair) {
+                                SpeedDialTile(
+                                    song = song,
+                                    onClick = { onSongClick(song, quickPicks) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+        }
+
+        // Quick Picks Carousel
         item {
             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
                 Text(
@@ -188,10 +226,6 @@ fun HomeScreen(
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
-        }
-
-        // Quick Picks Horizontal Cards
-        item {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -206,7 +240,66 @@ fun HomeScreen(
             }
         }
 
-        // Trending Tracks Section Header
+        // Keep Listening (Room Play History)
+        if (keepListening.isNotEmpty()) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+                    Text(
+                        text = "Keep listening",
+                        color = AuriTextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Most played on this device",
+                        color = AuriTextMuted,
+                        fontSize = 13.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    items(keepListening) { song ->
+                        QuickPickCard(
+                            song = song,
+                            onClick = { onSongClick(song, keepListening) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Forgotten Favorites
+        if (forgottenFavorites.isNotEmpty()) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+                    Text(
+                        text = "Forgotten favorites",
+                        color = AuriTextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    items(forgottenFavorites) { song ->
+                        QuickPickCard(
+                            song = song,
+                            onClick = { onSongClick(song, forgottenFavorites) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Trending Tracks Section
         item {
             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
                 Text(
@@ -224,12 +317,54 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(10.dp))
         }
 
-        // Trending Tracks List
         items(displayedSongs) { song ->
             SongRowItem(
                 song = song,
                 onClick = { onSongClick(song, displayedSongs) },
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpeedDialTile(
+    song: Song,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(AuriGlassSurface)
+            .border(1.dp, AuriGlassBorder, shape)
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AlbumArt(
+            thumbnailUrl = song.thumbnailUrl,
+            contentDescription = song.title,
+            modifier = Modifier.size(44.dp),
+            cornerRadius = 8.dp
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                color = AuriTextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = song.artist,
+                color = AuriTextMuted,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -242,7 +377,6 @@ fun QuickPickCard(
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(16.dp)
-
     Box(
         modifier = modifier
             .width(160.dp)
@@ -256,8 +390,7 @@ fun QuickPickCard(
             AlbumArt(
                 thumbnailUrl = song.thumbnailUrl,
                 contentDescription = song.title,
-                modifier = Modifier
-                    .size(140.dp),
+                modifier = Modifier.size(140.dp),
                 cornerRadius = 12.dp
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -294,7 +427,6 @@ fun SongRowItem(
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(14.dp)
-
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -314,9 +446,7 @@ fun SongRowItem(
                 modifier = Modifier.size(52.dp),
                 cornerRadius = 10.dp
             )
-
             Spacer(modifier = Modifier.width(14.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
@@ -332,7 +462,8 @@ fun SongRowItem(
                         color = AuriTextSecondary,
                         fontSize = 13.sp,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -342,7 +473,6 @@ fun SongRowItem(
                     )
                 }
             }
-
             Box(
                 modifier = Modifier
                     .size(36.dp)

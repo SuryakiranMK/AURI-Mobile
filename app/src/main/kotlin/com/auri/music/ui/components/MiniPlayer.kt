@@ -3,6 +3,7 @@ package com.auri.music.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,10 +24,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,10 +41,8 @@ import com.auri.music.model.PlaybackState
 import com.auri.music.ui.theme.AuriGlassBorder
 import com.auri.music.ui.theme.AuriGlassSurfaceElevated
 import com.auri.music.ui.theme.AuriGreenHighRes
-import com.auri.music.ui.theme.AuriTextMuted
 import com.auri.music.ui.theme.AuriTextPrimary
 import com.auri.music.ui.theme.AuriTextSecondary
-import com.auri.music.ui.theme.AuriVioletBright
 import com.auri.music.ui.theme.AuriVioletElectric
 
 @Composable
@@ -47,6 +51,7 @@ fun MiniPlayer(
     onExpandClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
+    onPreviousClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentSong = playbackState.currentSong ?: return
@@ -55,18 +60,33 @@ fun MiniPlayer(
     } else 0f
 
     val shape = RoundedCornerShape(16.dp)
+    var swipeOffsetX by remember { mutableFloatStateOf(0f) }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .clip(shape)
-            .background(AuriGlassSurfaceElevated.copy(alpha = 0.95f))
+            .background(AuriGlassSurfaceElevated.copy(alpha = 0.96f))
             .border(1.dp, AuriGlassBorder, shape)
+            .pointerInput(currentSong.id) {
+                detectHorizontalDragGestures(
+                    onDragStart = { swipeOffsetX = 0f },
+                    onHorizontalDrag = { _, dragAmount -> swipeOffsetX += dragAmount },
+                    onDragEnd = {
+                        if (swipeOffsetX < -90f) {
+                            onNextClick()
+                        } else if (swipeOffsetX > 90f) {
+                            onPreviousClick()
+                        }
+                        swipeOffsetX = 0f
+                    },
+                    onDragCancel = { swipeOffsetX = 0f }
+                )
+            }
             .clickable(onClick = onExpandClick)
     ) {
         Column {
-            // Thin accent progress bar at top of mini player
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -82,7 +102,6 @@ fun MiniPlayer(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Album Art
                 AlbumArt(
                     thumbnailUrl = currentSong.thumbnailUrl,
                     contentDescription = currentSong.title,
@@ -93,7 +112,6 @@ fun MiniPlayer(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Song Title & Artist
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = currentSong.title,
@@ -109,10 +127,10 @@ fun MiniPlayer(
                             color = AuriTextSecondary,
                             fontSize = 12.sp,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        // Quality badge
                         Text(
                             text = if (currentSong.isOpus) "OPUS" else "AAC",
                             color = AuriGreenHighRes,
@@ -125,7 +143,8 @@ fun MiniPlayer(
                     }
                 }
 
-                // Play / Pause Button
+                Spacer(modifier = Modifier.width(6.dp))
+
                 IconButton(
                     onClick = onPlayPauseClick,
                     modifier = Modifier
@@ -140,9 +159,8 @@ fun MiniPlayer(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
-                // Skip Next Button
                 IconButton(
                     onClick = onNextClick,
                     modifier = Modifier.size(36.dp)
