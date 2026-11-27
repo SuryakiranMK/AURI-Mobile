@@ -1,5 +1,0 @@
-[target.x86_64-linux-android]
-linker = "C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\ndk\\27.2.12479018\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\x86_64-linux-android35-clang.cmd"
-
-[target.aarch64-linux-android]
-linker = "C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\ndk\\27.2.12479018\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\aarch64-linux-android35-clang.cmd"
