@@ -77,8 +77,8 @@ import com.metrolist.shared.constants.DownloadQueueJsonKey
 import com.metrolist.shared.constants.DownloadedCollectionSortDirectionKey
 import com.metrolist.shared.constants.DownloadedCollectionSortKey
 import com.metrolist.shared.constants.EnableHapticFeedbackKey
-import com.metrolist.shared.constants.EnableLiquidGlassKey
 import com.metrolist.shared.constants.EnableLandscapeScalingKey
+import com.metrolist.shared.constants.EnableLiquidGlassKey
 import com.metrolist.shared.constants.EqualizerActiveProfileIdKey
 import com.metrolist.shared.constants.EqualizerCurrentProfileJsonKey
 import com.metrolist.shared.constants.EqualizerEnabledKey
@@ -1372,15 +1372,9 @@ class Settings(
         blockedSongIds = updated.joinToString(",")
     }
 
-    fun getCurrentThemeIsDark(): Boolean =
-        when (themeMode) {
-            ThemeMode.LIGHT -> false
-            ThemeMode.DARK, ThemeMode.PURE_BLACK -> true
-            ThemeMode.AUTO -> systemInDarkTheme
-        }
+    fun getCurrentThemeIsDark(): Boolean = true
 
-    fun isPureBlackTheme(darkTheme: Boolean = getCurrentThemeIsDark()): Boolean =
-        darkTheme && (themeMode == ThemeMode.PURE_BLACK || (themeMode == ThemeMode.AUTO && autoPureBlack))
+    fun isPureBlackTheme(darkTheme: Boolean = getCurrentThemeIsDark()): Boolean = themeMode == ThemeMode.PURE_BLACK || autoPureBlack
 
     companion object {
         private val backupCredentialKeys =

@@ -55,6 +55,7 @@ internal class SilenceSkippingSupport(
     val playbackHeadPosition: Long? get() = audioPositionDiagnostics.playbackHeadPosition()
 
     @Volatile private var equalizer: EqualizerAudioProcessor? = null
+
     @Volatile var auriDsp: com.auri.music.player.AuriDspAudioProcessor? = null
         private set
 
@@ -72,7 +73,10 @@ internal class SilenceSkippingSupport(
                 enableAudioOutputPlaybackParams: Boolean,
             ): AudioSink {
                 val equalizer = EqualizerAudioProcessor().also { this@SilenceSkippingSupport.equalizer = it }
-                val auriDspProcessor = com.auri.music.player.AuriDspAudioProcessor().also { this@SilenceSkippingSupport.auriDsp = it }
+                val auriDspProcessor =
+                    com.auri.music.player
+                        .AuriDspAudioProcessor()
+                        .also { this@SilenceSkippingSupport.auriDsp = it }
                 return pitchSafeAudioSink(
                     context,
                     enableAudioOutputPlaybackParams,

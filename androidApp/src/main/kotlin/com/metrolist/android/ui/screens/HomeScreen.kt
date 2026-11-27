@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -98,6 +99,7 @@ import com.metrolist.shared.model.isAvailableOffline
 import com.metrolist.shared.settings.LibraryFilterType
 import com.metrolist.shared.ui.LocalIsTv
 import com.metrolist.shared.ui.components.ChipShelf
+import com.metrolist.shared.ui.components.HomeFrostedArtworkBlur
 import com.metrolist.shared.ui.components.HomeLoadingPlaceholder
 import com.metrolist.shared.ui.components.PopupVisibility
 import com.metrolist.shared.ui.components.RefreshIndicator
@@ -362,9 +364,22 @@ fun HomeScreen(
         )
     }
 
+    val homeArtworkThumbnail =
+        remember(currentSong.value?.thumbnail, uiState) {
+            currentSong.value?.thumbnail?.takeIf { it.isNotBlank() }
+                ?: uiState.quickPicks.firstOrNull()?.thumbnail
+                ?: uiState.speedDialItems.firstOrNull()?.thumbnail
+                ?: uiState.trending.firstOrNull()?.thumbnail
+        }
+
     Box(
         modifier = Modifier.fillMaxSize().nestedScroll(fabNestedScrollConnection),
     ) {
+        HomeFrostedArtworkBlur(
+            thumbnailUrl = homeArtworkThumbnail,
+            modifier = Modifier.fillMaxWidth().height(520.dp),
+        )
+
         if (enablePullToRefresh) {
             val pullToRefreshState = rememberPullToRefreshState()
             PullToRefreshBox(
@@ -404,31 +419,15 @@ fun HomeScreen(
                             bottom = floatingActionsBottomInset.value,
                         ),
             ) {
-                Column(
+                FloatingActionButton(
+                    onClick = ::shuffleHomeContent,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    SmallFloatingActionButton(
-                        onClick = onNavigateToRecognition,
-                        shape = RoundedCornerShape(8.dp),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.Outlined.AudioCapture,
-                            contentDescription = stringResource(Res.string.recognize_music),
-                        )
-                    }
-                    FloatingActionButton(
-                        onClick = ::shuffleHomeContent,
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.Rounded.Shuffle,
-                            contentDescription = stringResource(Res.string.shuffle),
-                        )
-                    }
+                    Icon(
+                        imageVector = MetrolistIcons.Rounded.Shuffle,
+                        contentDescription = stringResource(Res.string.shuffle),
+                    )
                 }
             }
         }

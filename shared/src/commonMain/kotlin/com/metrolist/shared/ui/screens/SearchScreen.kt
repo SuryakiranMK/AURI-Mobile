@@ -92,6 +92,7 @@ data class SearchScreenText(
     val back: String,
     val clear: String,
     val microphoneContentDescription: String,
+    val recognizeMusicContentDescription: String = "",
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,6 +126,7 @@ fun SearchScreen(
     onMixClick: (YTItem) -> Unit = {},
     itemContainer: @Composable (YTItem, @Composable () -> Unit) -> Unit = { _, content -> content() },
     onMicrophoneClick: (() -> Unit)? = null,
+    onRecognitionClick: (() -> Unit)? = null,
     focusRequester: FocusRequester = remember { FocusRequester() },
     showSearchBar: Boolean = true,
     searchBarEndPadding: Dp = 0.dp,
@@ -165,7 +167,9 @@ fun SearchScreen(
                                 onClear = { onQueryChange("") },
                                 onBack = onBack,
                                 onMicrophoneClick = onMicrophoneClick,
+                                onRecognitionClick = onRecognitionClick,
                                 microphoneContentDescription = text.microphoneContentDescription,
+                                recognizeMusicLabel = text.recognizeMusicContentDescription,
                                 isQuerySubmitted = isQuerySubmitted,
                                 focusRequester = focusRequester,
                                 placeholder = text.searchPlaceholder,
@@ -233,6 +237,8 @@ fun SearchBar(
     backLabel: String,
     clearLabel: String,
     modifier: Modifier = Modifier,
+    onRecognitionClick: (() -> Unit)? = null,
+    recognizeMusicLabel: String = "",
     history: List<String> = emptyList(),
     onHistoryItemClick: (String) -> Unit = {},
     onRemoveHistoryItem: (String) -> Unit = {},
@@ -271,7 +277,121 @@ fun SearchBar(
     ) {
         val isWide = maxWidth > 480.dp
 
-        if (!isWide && !isTv) {
+        if (onRecognitionClick != null) {
+            val barHeight = 44.dp
+            val iconSize = 20.dp
+            val fontSize = 14.sp
+            Row(
+                modifier = Modifier.fillMaxWidth().height(barHeight),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(barHeight).tvFocusHighlight(CircleShape, scale = 1f),
+                    shapes = IconButtonDefaults.shapes(),
+                ) {
+                    Icon(
+                        imageVector = MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = backLabel,
+                        modifier = Modifier.size(iconSize),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(barHeight)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                            .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        BasicTextField(
+                            state = textFieldState,
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .focusRequester(focusRequester),
+                            keyboardOptions = KeyboardOptions(showKeyboardOnFocus = !isTv || tvKeyboardRequested),
+                            textStyle =
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = fontSize,
+                                ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            lineLimits = TextFieldLineLimits.SingleLine,
+                            onKeyboardAction = { submitSearch(textFieldState.text.toString()) },
+                            decorator = { innerTextField ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (query.isEmpty()) {
+                                        Text(
+                                            text = placeholder,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = fontSize),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            },
+                        )
+
+                        if (query.isNotEmpty()) {
+                            IconButton(
+                                onClick = onClear,
+                                modifier = Modifier.size(barHeight),
+                                shapes = IconButtonDefaults.shapes(),
+                            ) {
+                                Icon(
+                                    imageVector = MetrolistIcons.Default.Clear,
+                                    contentDescription = clearLabel,
+                                    modifier = Modifier.size(iconSize),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        } else if (onMicrophoneClick != null) {
+                            IconButton(
+                                onClick = onMicrophoneClick,
+                                modifier = Modifier.size(barHeight),
+                                shapes = IconButtonDefaults.shapes(),
+                            ) {
+                                Icon(
+                                    imageVector = MetrolistIcons.Rounded.Mic,
+                                    contentDescription = microphoneContentDescription,
+                                    modifier = Modifier.size(iconSize),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                IconButton(
+                    onClick = onRecognitionClick,
+                    modifier =
+                        Modifier
+                            .size(barHeight)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                            .tvFocusHighlight(CircleShape, scale = 1f),
+                    shapes = IconButtonDefaults.shapes(),
+                ) {
+                    Icon(
+                        imageVector = MetrolistIcons.Outlined.AudioCapture,
+                        contentDescription = recognizeMusicLabel,
+                        modifier = Modifier.size(iconSize),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        } else if (!isWide && !isTv) {
             val searchBarColors =
                 SearchBarDefaults.colors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

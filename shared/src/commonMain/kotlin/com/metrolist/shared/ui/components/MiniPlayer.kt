@@ -210,8 +210,7 @@ fun MiniPlayer(
                     } else {
                         Modifier
                     },
-                )
-                .graphicsLayer {
+                ).graphicsLayer {
                     translationX = dragOffsetX
                 }.pointerInput(canSkipNext, canSkipPrevious, layoutDirection, swipeThreshold) {
                     detectHorizontalDragGestures(

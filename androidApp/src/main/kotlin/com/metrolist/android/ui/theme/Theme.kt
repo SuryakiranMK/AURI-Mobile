@@ -128,16 +128,18 @@ fun MetrolistTheme(
     val colorScheme =
         remember(baseColorScheme, pureBlack, darkTheme) {
             if (darkTheme) {
+                val accent = baseColorScheme.primary.takeIf { it != Color.Unspecified } ?: CosmicElectricViolet
+                val secondaryAccent = baseColorScheme.secondary.takeIf { it != Color.Unspecified } ?: CosmicCyberCyan
                 baseColorScheme.copy(
-                    primary = CosmicElectricViolet,
+                    primary = accent,
                     onPrimary = Color.White,
                     primaryContainer = CosmicDarkObsidianElevated,
-                    onPrimaryContainer = CosmicElectricViolet,
-                    secondary = CosmicCyberCyan,
+                    onPrimaryContainer = accent,
+                    secondary = secondaryAccent,
                     onSecondary = Color.Black,
                     secondaryContainer = CosmicDarkObsidianElevated,
-                    onSecondaryContainer = CosmicCyberCyan,
-                    tertiary = CosmicCyberCyan,
+                    onSecondaryContainer = secondaryAccent,
+                    tertiary = secondaryAccent,
                     onTertiary = Color.Black,
                     background = CosmicPureBlack,
                     onBackground = CosmicTextPrimary,

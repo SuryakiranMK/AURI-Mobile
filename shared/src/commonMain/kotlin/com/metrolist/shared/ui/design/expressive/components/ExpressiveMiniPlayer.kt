@@ -7,11 +7,10 @@
 
 package com.metrolist.shared.ui.design.expressive.components
 
-import androidx.compose.foundation.BorderStroke
-
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -33,7 +32,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.metrolist.shared.ui.components.liquidGlass
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
@@ -91,6 +89,7 @@ import com.metrolist.shared.ui.components.PlayerSheetSurface
 import com.metrolist.shared.ui.components.WavyCircularProgressIndicator
 import com.metrolist.shared.ui.components.currentSongArtworkShape
 import com.metrolist.shared.ui.components.images.AsyncImage
+import com.metrolist.shared.ui.components.liquidGlass
 import com.metrolist.shared.ui.components.rememberArtworkShapeRotation
 import com.metrolist.shared.ui.components.rememberTrackMarquee
 import com.metrolist.shared.ui.haptics.HapticEvent
@@ -165,8 +164,7 @@ fun ExpressiveMiniPlayer(
                 .liquidGlass(
                     shape = RoundedCornerShape(ExpressiveMiniPlayerCornerRadius),
                     interactive = false,
-                )
-                .onFocusChanged { isFocused = it.isFocused }
+                ).onFocusChanged { isFocused = it.isFocused }
                 .onPreviewKeyEvent { event ->
                     if (isFocused && event.type == KeyEventType.KeyUp && (event.key == Key.Enter || event.key == Key.DirectionCenter)) {
                         onDpadExpand()

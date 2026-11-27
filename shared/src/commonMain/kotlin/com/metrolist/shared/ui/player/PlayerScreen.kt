@@ -11,6 +11,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -28,6 +29,11 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.metrolist.shared.generated.resources.action_download
+import com.metrolist.shared.generated.resources.save
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -163,6 +169,7 @@ import com.metrolist.shared.ui.components.TopRoundedSurfaceShape
 import com.metrolist.shared.ui.components.adjacentArtworkUrls
 import com.metrolist.shared.ui.components.focusOutline
 import com.metrolist.shared.ui.components.images.AsyncImage
+import com.metrolist.shared.ui.components.liquidGlass
 import com.metrolist.shared.ui.components.lyrics.LyricsOffsetEditor
 import com.metrolist.shared.ui.components.rememberBottomSheetState
 import com.metrolist.shared.ui.components.sheetBackContent
@@ -527,6 +534,11 @@ fun PlayerScreen(
         )
 
     val playPauseFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(currentSong?.id) {
+        currentSong?.let { song ->
+            viewModel.loadLyrics(song)
+        }
+    }
     LaunchedEffect(bottomSheetState.isExpanded, requestPlayPauseFocus, currentSong?.id) {
         if (bottomSheetState.isExpanded && requestPlayPauseFocus) {
             runCatching { playPauseFocusRequester.requestFocus() }
@@ -540,34 +552,37 @@ fun PlayerScreen(
         lightStatusBars = false,
     )
 
-    val dominantColor = remember(uiState.dominantColor, uiState.gradientColors) {
-        uiState.dominantColor.takeIf { it != Color.Unspecified && it.alpha > 0.05f }
-            ?: uiState.gradientColors.firstOrNull()
-            ?: Color(0xFF8B5CF6)
-    }
+    val dominantColor =
+        remember(uiState.dominantColor, uiState.gradientColors) {
+            uiState.dominantColor.takeIf { it != Color.Unspecified && it.alpha > 0.05f }
+                ?: uiState.gradientColors.firstOrNull()
+                ?: Color(0xFF8B5CF6)
+        }
     val oledBlack = Color(0xFF05030E)
 
     // Current synchronized lyric preview
     val currentPosition by viewModel.currentPosition.collectWhilePlayerActive(isPlayerContentVisible && isScreenVisible)
-    val currentLineIndex = remember(uiState.lyrics, currentPosition, uiState.lyricsOffsetMs) {
-        val pos = currentPosition + uiState.lyricsOffsetMs
-        var idx = -1
-        for (i in uiState.lyrics.indices) {
-            if (uiState.lyrics[i].time <= pos) {
-                idx = i
+    val currentLineIndex =
+        remember(uiState.lyrics, currentPosition, uiState.lyricsOffsetMs) {
+            val pos = currentPosition + uiState.lyricsOffsetMs
+            var idx = -1
+            for (i in uiState.lyrics.indices) {
+                if (uiState.lyrics[i].time <= pos) {
+                    idx = i
+                } else {
+                    break
+                }
+            }
+            idx
+        }
+    val activeLineText =
+        remember(currentLineIndex, uiState.lyrics) {
+            if (currentLineIndex in uiState.lyrics.indices) {
+                uiState.lyrics[currentLineIndex].text
             } else {
-                break
+                ""
             }
         }
-        idx
-    }
-    val activeLineText = remember(currentLineIndex, uiState.lyrics) {
-        if (currentLineIndex in uiState.lyrics.indices) {
-            uiState.lyrics[currentLineIndex].text
-        } else {
-            ""
-        }
-    }
 
     val queueSession = rememberQueueSession(viewModel)
     val queueFocusRequester = remember { FocusRequester() }
@@ -575,28 +590,24 @@ fun PlayerScreen(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val maxHeight = maxHeight
-        val queueSheetTopPadding = 56.dp
-        val queueSheetState =
-            rememberBottomSheetState(
-                dismissedBound = 0.dp,
-                collapsedBound = 0.dp,
-                expandedBound = maxHeight - queueSheetTopPadding,
-                initialAnchor = COLLAPSED_ANCHOR,
-            )
-        val openQueueSheet = {
-            queueSheetState.expandSoft()
-        }
-        val queueOpen by remember(queueSheetState) {
-            derivedStateOf { queueSheetState.progress > 0f }
-        }
-        val queueHandlesBack by remember(queueSheetState) {
-            derivedStateOf { queueSheetState.progress > 0.2f }
-        }
+        var queueStage by rememberSaveable { mutableStateOf(QueueSheetStage.COLLAPSED) }
+        val targetQueueHeight =
+            when (queueStage) {
+                QueueSheetStage.COLLAPSED -> 0.dp
+                QueueSheetStage.HALF -> maxHeight * 0.54f
+                QueueSheetStage.FULL -> maxHeight - 36.dp
+            }
+        val animatedQueueHeight by animateDpAsState(
+            targetValue = targetQueueHeight,
+            animationSpec = spring<androidx.compose.ui.unit.Dp>(stiffness = Spring.StiffnessMediumLow),
+            label = "queueHeightAnim",
+        )
 
         NavigationBackHandler(enabled = isPlayerBackHandlerEnabled) {
             when {
                 showLyricsOffsetEditor -> showLyricsOffsetEditor = false
-                queueHandlesBack -> queueSheetState.collapseSoft()
+                queueStage == QueueSheetStage.FULL -> queueStage = QueueSheetStage.HALF
+                queueStage == QueueSheetStage.HALF -> queueStage = QueueSheetStage.COLLAPSED
                 uiState.isLyricsVisible -> viewModel.setLyricsVisible(false)
                 else -> onClose()
             }
@@ -720,8 +731,7 @@ fun PlayerScreen(
                                     shape = RoundedCornerShape(16.dp),
                                     spotColor = dominantColor.copy(alpha = 0.6f),
                                     ambientColor = Color.Black.copy(alpha = 0.5f),
-                                )
-                                .clip(RoundedCornerShape(16.dp))
+                                ).clip(RoundedCornerShape(16.dp))
                                 .artworkSwipe(
                                     enabled = artworkSwipeEnabled,
                                     sensitivity = Settings.shared.swipeSensitivity,
@@ -781,58 +791,97 @@ fun PlayerScreen(
                     }
                 }
 
-                // METADATA ROW
+                // METADATA ROW: Left-aligned title and artist
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = currentSong?.title ?: stringResource(Res.string.unknown),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = currentSong?.albumId != null) {
+                                    currentSong?.albumId?.let(onNavigateToAlbum)
+                                },
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = currentSong?.artists?.joinToString { it.name } ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF94A3B8),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = currentSong?.artists?.firstOrNull()?.id != null) {
+                                    currentSong
+                                        ?.artists
+                                        ?.firstOrNull()
+                                        ?.id
+                                        ?.let(onNavigateToArtist)
+                                },
+                    )
+                }
+
+                // ACTION CHIPS ROW: [ Heart ] [ Lyrics ] [ Save ] [ Download ] [ Info ]
                 Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 6.dp),
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = currentSong?.title ?: stringResource(Res.string.unknown),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable(enabled = currentSong?.albumId != null) {
-                                        currentSong?.albumId?.let(onNavigateToAlbum)
-                                    },
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = currentSong?.artists?.joinToString { it.name } ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF94A3B8),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable(enabled = currentSong?.artists?.firstOrNull()?.id != null) {
-                                        currentSong?.artists?.firstOrNull()?.id?.let(onNavigateToArtist)
-                                    },
-                        )
-                    }
-
-                    IconButton(
+                    // 1. Heart (Like / Favorite)
+                    PlayerActionChip(
+                        icon = if (isLiked) MetrolistIcons.Rounded.Favorite else MetrolistIcons.Rounded.FavoriteBorder,
+                        iconTint = if (isLiked) Color(0xFFEF4444) else Color.White,
+                        label = null,
                         onClick = {
                             hapticManager.toggle(!isLiked)
                             toggleDisplayedLike()
                         },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isLiked) MetrolistIcons.Rounded.Favorite else MetrolistIcons.Rounded.FavoriteBorder,
-                            contentDescription = stringResource(if (isLiked) Res.string.unlike else Res.string.action_like),
-                            tint = if (isLiked) Color(0xFFEF4444) else Color.White,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
+                    )
+
+                    // 2. Lyrics
+                    PlayerActionChip(
+                        icon = MetrolistIcons.Outlined.Lyrics,
+                        iconTint = Color.White,
+                        label = stringResource(Res.string.lyrics),
+                        onClick = { viewModel.setLyricsVisible(true) },
+                    )
+
+                    // 3. Save to playlist
+                    PlayerActionChip(
+                        icon = MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
+                        iconTint = Color.White,
+                        label = stringResource(Res.string.save),
+                        onClick = { showPlayerMenu = true },
+                    )
+
+                    // 4. Download
+                    PlayerActionChip(
+                        icon = MetrolistIcons.Outlined.Download,
+                        iconTint = Color.White,
+                        label = stringResource(Res.string.action_download),
+                        onClick = { showPlayerMenu = true },
+                    )
+
+                    // 5. Details (Info)
+                    PlayerActionChip(
+                        icon = MetrolistIcons.Outlined.Info,
+                        iconTint = Color.White,
+                        label = stringResource(Res.string.details),
+                        onClick = { showSongDetails = true },
+                    )
                 }
 
                 // SEEKBAR: Sleek progress slider with elapsed and duration
@@ -860,7 +909,7 @@ fun PlayerScreen(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                            .padding(horizontal = 20.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -955,73 +1004,32 @@ fun PlayerScreen(
                     }
                 }
 
-                // QUICK ACTIONS BAR
-                Row(
+                // BOTTOM QUEUE DRAWER PEEK HANDLE (Matching Image 1)
+                Box(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                            .clickable { queueStage = QueueSheetStage.HALF }
+                            .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    IconButton(
-                        onClick = { showSongDetails = true },
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.Outlined.Info,
-                            contentDescription = stringResource(Res.string.details),
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp),
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .width(36.dp)
+                                    .height(4.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.45f)),
                         )
-                    }
-
-                    IconButton(
-                        onClick = { showDeviceConnectSheet = true },
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.Outlined.Headphones,
-                            contentDescription = stringResource(Res.string.audio_output),
-                            tint = if (castState.isConnected) Color.Cyan else Color.White,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.setLyricsVisible(!uiState.isLyricsVisible) },
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.Outlined.Lyrics,
-                            contentDescription = stringResource(Res.string.lyrics),
-                            tint = if (uiState.isLyricsVisible) MaterialTheme.colorScheme.primary else Color.White,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { showPlayerMenu = true },
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
-                            contentDescription = stringResource(Res.string.add_to_playlist),
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp),
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { openQueueSheet() },
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.AutoMirrored.Outlined.QueueMusic,
-                            contentDescription = stringResource(Res.string.queue),
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp),
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.size(4.dp).clip(CircleShape).background(Color(0xFF60A5FA)))
+                            Box(Modifier.size(4.dp).clip(CircleShape).background(Color(0xFFFBBF24)))
+                        }
                     }
                 }
 
@@ -1037,10 +1045,12 @@ fun PlayerScreen(
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(dominantContainerColor)
-                            .border(width = 1.dp, color = Color(0x338B5CF6), shape = RoundedCornerShape(16.dp))
-                            .padding(16.dp),
+                            .liquidGlass(
+                                shape = RoundedCornerShape(16.dp),
+                                specularBorderColor = dominantColor.copy(alpha = 0.4f),
+                                surfaceColor = dominantContainerColor,
+                                fallbackColor = dominantContainerColor,
+                            ).padding(16.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1167,10 +1177,12 @@ fun PlayerScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 20.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF0E0B1F))
-                                .border(width = 1.dp, color = Color(0x338B5CF6), shape = RoundedCornerShape(16.dp))
-                                .clickable(enabled = primaryArtistId != null) {
+                                .liquidGlass(
+                                    shape = RoundedCornerShape(16.dp),
+                                    specularBorderColor = Color(0x338B5CF6),
+                                    surfaceColor = Color(0xDD0E0B1F),
+                                    fallbackColor = Color(0xFF0E0B1F),
+                                ).clickable(enabled = primaryArtistId != null) {
                                     if (primaryArtistId != null) onNavigateToArtist(primaryArtistId)
                                 },
                     ) {
@@ -1322,65 +1334,205 @@ fun PlayerScreen(
                 }
             }
 
-            // Queue Sheet
-            BottomSheet(
-                state = queueSheetState,
-                backHandlerEnabled = isPlayerBackHandlerEnabled && queueHandlesBack,
-                predictiveBack = true,
-                modifier = Modifier.fillMaxSize().padding(top = queueSheetTopPadding),
-                isDraggableWhenCollapsed = false,
-                collapsedContentAlpha = { 0f },
-                contentAlpha = { progress -> ((progress - 0.2f) * 4f).coerceIn(0f, 1f) },
-                preserveContentWhenCollapsed = false,
-                background = {
-                    if (queueOpen) {
+            // Queue Sheet (Matching Image 2 and Image 3)
+            if (animatedQueueHeight.value > 10f) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.55f * (animatedQueueHeight.value / maxHeight.value).coerceIn(0f, 1f)))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {
+                                    if (queueStage == QueueSheetStage.FULL) {
+                                        queueStage = QueueSheetStage.HALF
+                                    } else {
+                                        queueStage = QueueSheetStage.COLLAPSED
+                                    }
+                                },
+                            ),
+                )
+
+                Surface(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(animatedQueueHeight),
+                    shape = TopRoundedSurfaceShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Drag Handle
                         Box(
                             modifier =
                                 Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f * queueSheetState.progress.coerceIn(0f, 1f)))
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = { queueSheetState.collapseSoft() },
-                                    ),
-                        )
-                    }
-                },
-                collapsedContent = {},
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize().blockInput(!queueSheetState.acceptsInput),
-                    shape = TopRoundedSurfaceShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    Column(modifier = Modifier.fillMaxSize().sheetBackContent()) {
-                        QueueSheetDragHandle(
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .pointerInput(queueStage) {
+                                        detectVerticalDragGestures { _, dragAmount ->
+                                            if (dragAmount < -15 && queueStage == QueueSheetStage.HALF) {
+                                                queueStage = QueueSheetStage.FULL
+                                            } else if (dragAmount > 15 && queueStage == QueueSheetStage.FULL) {
+                                                queueStage = QueueSheetStage.HALF
+                                            } else if (dragAmount > 20 && queueStage == QueueSheetStage.HALF) {
+                                                queueStage = QueueSheetStage.COLLAPSED
+                                            }
+                                        }
+                                    },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .width(36.dp)
+                                        .height(4.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.45f)),
+                            )
+                        }
+
+                        // Mini Transport Header (Only when FULL - matching Image 3!)
+                        if (queueStage == QueueSheetStage.FULL) {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                AsyncImage(
+                                    url = currentSong?.displayThumbnail,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)),
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = currentSong?.title ?: "",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = currentSong?.artists?.joinToString { it.name } ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF94A3B8),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                IconButton(onClick = viewModel::previous) {
+                                    Icon(
+                                        MetrolistIcons.Rounded.SkipPrevious,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp),
+                                    )
+                                }
+                                IconButton(onClick = viewModel::togglePlayPause) {
+                                    Icon(
+                                        if (isPlaying) MetrolistIcons.Rounded.Pause else MetrolistIcons.Rounded.PlayArrow,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(32.dp),
+                                    )
+                                }
+                                IconButton(onClick = viewModel::next) {
+                                    Icon(
+                                        MetrolistIcons.Rounded.SkipNext,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp),
+                                    )
+                                }
+                            }
+                            HorizontalDivider(
+                                color = Color.White.copy(alpha = 0.10f),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            )
+                        }
+
+                        // Header: "Playing from" + "+ Save" (matching Image 2 & 3!)
+                        Row(
                             modifier =
-                                Modifier.align(Alignment.CenterHorizontally).graphicsLayer {
-                                    alpha = ((queueSheetState.progress - 0.4f) * 2.5f).coerceIn(0f, 1f)
-                                },
-                        )
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(Res.string.now_playing),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF94A3B8),
+                                )
+                                val queueOrPlaylistTitle =
+                                    uiState.queueTitle?.takeIf { it.isNotBlank() }
+                                        ?: currentSong?.album
+                                        ?: stringResource(Res.string.now_playing)
+                                Text(
+                                    text = queueOrPlaylistTitle,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Color(0x22FFFFFF))
+                                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50))
+                                        .clickable { showPlayerMenu = true }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text(
+                                    text = stringResource(Res.string.save),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                )
+                            }
+                        }
+
+                        // Queue Screen content
                         QueueScreen(
                             session = queueSession,
                             viewModel = viewModel,
-                            onClose = { queueSheetState.collapseSoft() },
+                            onClose = {
+                                if (queueStage == QueueSheetStage.FULL) {
+                                    queueStage = QueueSheetStage.HALF
+                                } else {
+                                    queueStage = QueueSheetStage.COLLAPSED
+                                }
+                            },
                             onShowSleepTimer = { showSleepTimerDialog = true },
                             onNavigateToAlbum = { albumId ->
-                                queueSheetState.collapseSoft()
+                                queueStage = QueueSheetStage.COLLAPSED
                                 onNavigateToAlbum(albumId)
                             },
                             onNavigateToArtist = { artistId ->
-                                queueSheetState.collapseSoft()
+                                queueStage = QueueSheetStage.COLLAPSED
                                 onNavigateToArtist(artistId)
                             },
                             onNavigateToListenTogether = {
-                                queueSheetState.collapseSoft()
+                                queueStage = QueueSheetStage.COLLAPSED
                                 onNavigateToListenTogether()
                             },
                             modifier = Modifier.fillMaxWidth().weight(1f).then(queueFocusModifier),
-                            nestedScrollConnection = queueSheetState.preUpPostDownNestedScrollConnection,
-                            backHandlerEnabled = isPlayerBackHandlerEnabled && queueHandlesBack,
+                            backHandlerEnabled = isPlayerBackHandlerEnabled && queueStage != QueueSheetStage.COLLAPSED,
                             handleDismissalBack = false,
                         )
                     }
@@ -1420,6 +1572,10 @@ fun PlayerScreen(
                         showPlayerMenu = false
                         showSongDetails = true
                     },
+                    onShowSleepTimer = {
+                        showPlayerMenu = false
+                        showSleepTimerDialog = true
+                    },
                     extraActions = emptyList(),
                 )
             }
@@ -1450,6 +1606,47 @@ fun PlayerScreen(
                     },
                 )
             }
+        }
+    }
+}
+
+enum class QueueSheetStage {
+    COLLAPSED,
+    HALF,
+    FULL,
+}
+
+@Composable
+private fun PlayerActionChip(
+    icon: ImageVector,
+    iconTint: Color,
+    label: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(50))
+                .background(Color(0x22FFFFFF))
+                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = iconTint,
+            modifier = Modifier.size(18.dp),
+        )
+        if (label != null) {
+            Text(
+                text = label,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            )
         }
     }
 }

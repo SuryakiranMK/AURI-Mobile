@@ -141,6 +141,7 @@ fun PlayerMenu(
     onNavigateToArtist: (String) -> Unit = {},
     onNavigateToListenTogether: () -> Unit = {},
     onShowSongDetails: () -> Unit = onDismiss,
+    onShowSleepTimer: () -> Unit = {},
     extraActions: List<PlayerMenuAction> = emptyList(),
 ) {
     val suggestedToHostText = stringResource(Res.string.suggested_to_host)

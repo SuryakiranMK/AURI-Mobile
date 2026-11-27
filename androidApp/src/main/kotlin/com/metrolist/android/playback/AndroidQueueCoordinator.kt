@@ -223,13 +223,14 @@ internal class AndroidQueueCoordinator(
             _shuffleModeEnabled.value = player.isShuffleEnabled
             _repeatMode.value = if (restoreModes) state.repeatMode else Player.REPEAT_MODE_OFF
             player.seekTo(restoredPosition, PlaybackSeekSource("queue_restore", mapOf("reason" to "saved_queue")))
-            val restoredVolume = if (state.volume.isFinite() && state.volume in 0f..1f) {
-                state.volume
-            } else if (Settings.shared.hasSavedVolume) {
-                Settings.shared.volume
-            } else {
-                1.0f
-            }
+            val restoredVolume =
+                if (state.volume.isFinite() && state.volume in 0f..1f) {
+                    state.volume
+                } else if (Settings.shared.hasSavedVolume) {
+                    Settings.shared.volume
+                } else {
+                    1.0f
+                }
             player.setVolume(restoredVolume)
             Settings.shared.volume = restoredVolume
             true

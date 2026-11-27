@@ -141,16 +141,18 @@ fun themeColorScheme(
             generatedColorScheme(DefaultThemeColor, isDark, paletteStyle, contrast)
         }
     return if (isDark) {
+        val accent = scheme.primary.takeIf { it != Color.Unspecified } ?: CosmicElectricViolet
+        val sec = scheme.secondary.takeIf { it != Color.Unspecified } ?: CosmicCyberCyan
         scheme.copy(
-            primary = CosmicElectricViolet,
+            primary = accent,
             onPrimary = Color.White,
             primaryContainer = CosmicDarkObsidianElevated,
-            onPrimaryContainer = CosmicElectricViolet,
-            secondary = CosmicCyberCyan,
+            onPrimaryContainer = accent,
+            secondary = sec,
             onSecondary = Color.Black,
             secondaryContainer = CosmicDarkObsidianElevated,
-            onSecondaryContainer = CosmicCyberCyan,
-            tertiary = CosmicCyberCyan,
+            onSecondaryContainer = sec,
+            tertiary = sec,
             onTertiary = Color.Black,
             background = CosmicPureBlack,
             onBackground = CosmicTextPrimary,
@@ -197,17 +199,19 @@ private fun generatedColorScheme(
         specVersion = ColorSpec.SpecVersion.SPEC_2025,
     )
 
-fun ColorScheme.pureBlack() =
-    copy(
-        primary = CosmicElectricViolet,
+fun ColorScheme.pureBlack(): ColorScheme {
+    val accent = primary.takeIf { it != Color.Unspecified } ?: CosmicElectricViolet
+    val sec = secondary.takeIf { it != Color.Unspecified } ?: CosmicCyberCyan
+    return copy(
+        primary = accent,
         onPrimary = Color.White,
         primaryContainer = CosmicDarkObsidianElevated,
-        onPrimaryContainer = CosmicElectricViolet,
-        secondary = CosmicCyberCyan,
+        onPrimaryContainer = accent,
+        secondary = sec,
         onSecondary = Color.Black,
         secondaryContainer = CosmicDarkObsidianElevated,
-        onSecondaryContainer = CosmicCyberCyan,
-        tertiary = CosmicCyberCyan,
+        onSecondaryContainer = sec,
+        tertiary = sec,
         onTertiary = Color.Black,
         surface = CosmicPureBlack,
         background = CosmicPureBlack,
@@ -225,6 +229,7 @@ fun ColorScheme.pureBlack() =
         outline = Color(0xFF332A55),
         outlineVariant = CosmicFrostedBorder,
     )
+}
 
 expect class ThemeColorExtractor() {
     fun extractSeedColor(image: Any): Color

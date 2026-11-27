@@ -182,8 +182,7 @@ fun Modifier.liquidGlass(
                 scaleX = scale
                 scaleY = scale
             }
-        }
-        .clip(shape)
+        }.clip(shape)
         .background(surfaceColor)
         .border(
             width = borderWidth,

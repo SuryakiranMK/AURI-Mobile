@@ -44,7 +44,11 @@ actual class VideoPlayer actual constructor(
 
     actual fun close() = Unit
 
-    fun setTargetSize(width: Int, height: Int, fillViewport: Boolean = false) = Unit
+    fun setTargetSize(
+        width: Int,
+        height: Int,
+        fillViewport: Boolean = false,
+    ) = Unit
 
     fun dispose() = close()
 

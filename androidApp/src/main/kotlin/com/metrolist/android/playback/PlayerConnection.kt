@@ -504,7 +504,14 @@ class PlayerConnection(
                 _duration.value = (song?.duration ?: 0) * 1000L
                 _shuffleModeEnabled.value = snapshot.isShuffled
                 _repeatMode.value = if (Settings.shared.rememberShuffleAndRepeat) state.repeatMode else Player.REPEAT_MODE_OFF
-                val vol = if (state.volume.isFinite() && state.volume in 0f..1f) state.volume else (if (Settings.shared.hasSavedVolume) Settings.shared.volume else 1f)
+                val vol =
+                    if (state.volume.isFinite() &&
+                        state.volume in 0f..1f
+                    ) {
+                        state.volume
+                    } else {
+                        (if (Settings.shared.hasSavedVolume) Settings.shared.volume else 1f)
+                    }
                 _volume.value = vol
                 Settings.shared.volume = vol
                 Settings.shared.pendingContinuePlayback = Settings.shared.promptContinuePlayback && song != null

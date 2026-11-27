@@ -34,9 +34,6 @@ import androidx.compose.material3.ShortNavigationBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
-import androidx.compose.ui.graphics.Color
-import com.metrolist.shared.settings.Settings
-import com.metrolist.shared.ui.components.liquidGlass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -44,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -51,7 +49,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.metrolist.shared.settings.Settings
 import com.metrolist.shared.ui.components.focusOutline
+import com.metrolist.shared.ui.components.liquidGlass
 
 val LocalFloatingNavBar = compositionLocalOf { false }
 
@@ -169,8 +169,7 @@ private fun <T> FloatingNavigationBar(
                             shape = CircleShape,
                             interactive = true,
                             surfaceColor = if (selected) Color(0xDD2E1A47) else Color(0xCC0E0B1F),
-                        )
-                        .then(itemModifier(separateItem.key)),
+                        ).then(itemModifier(separateItem.key)),
                 shape = CircleShape,
                 color = separateColor,
                 contentColor = content,

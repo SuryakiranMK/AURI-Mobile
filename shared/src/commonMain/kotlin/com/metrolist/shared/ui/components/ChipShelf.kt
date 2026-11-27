@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.ui.graphics.Color
-import com.metrolist.shared.settings.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -33,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.chip_content_description
+import com.metrolist.shared.settings.Settings
 import com.metrolist.shared.ui.tv.tvFocusHighlight
 import com.metrolist.shared.ui.utils.carouselScroll
 import org.jetbrains.compose.resources.stringResource
@@ -162,8 +162,7 @@ fun ExpressiveFilterChip(
                     interactive = true,
                     pressedScale = 1.05f,
                     surfaceColor = if (selected) Color(0xDD2E1A47) else Color(0xCC0E0B1F),
-                )
-                .height(ButtonDefaults.ExtraSmallContainerHeight)
+                ).height(ButtonDefaults.ExtraSmallContainerHeight)
                 .tvFocusHighlight(shape)
                 .semantics { this.selected = selected },
     ) {

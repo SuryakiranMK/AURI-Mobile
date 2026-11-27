@@ -16,9 +16,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import com.metrolist.shared.settings.Settings
-import com.metrolist.shared.ui.components.liquidGlass
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -42,6 +39,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -98,6 +96,8 @@ import com.metrolist.shared.constants.WideNavigationRailExpandedWidth
 import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.drag_to_reorder_x
 import com.metrolist.shared.generated.resources.expand_sidebar
+import com.metrolist.shared.settings.Settings
+import com.metrolist.shared.ui.components.liquidGlass
 import com.metrolist.shared.ui.haptics.HapticEvent
 import com.metrolist.shared.ui.haptics.rememberMetrolistHaptics
 import com.metrolist.shared.ui.icons.MetrolistIcons
@@ -717,9 +717,8 @@ private fun <T> SlimNavigationBarContent(
                         )
                     } else {
                         Modifier.background(containerColor)
-                    }
-                )
-                .windowInsetsPadding(ShortNavigationBarDefaults.windowInsets)
+                    },
+                ).windowInsetsPadding(ShortNavigationBarDefaults.windowInsets)
                 .height(56.dp),
         containerColor = if (liquidGlassEnabled) Color.Transparent else containerColor,
         windowInsets = WindowInsets(0),

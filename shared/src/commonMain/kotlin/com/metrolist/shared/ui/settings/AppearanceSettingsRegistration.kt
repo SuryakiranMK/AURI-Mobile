@@ -47,16 +47,6 @@ internal fun SettingsUiRegistryBuilder.registerAppearanceSettings(host: SharedSe
     val themeChoices =
         listOf(
             SettingsChoice(
-                ThemeMode.AUTO.name,
-                stringResource(Res.string.audio_quality_auto),
-                preview = { ThemeModePreview(ThemeMode.AUTO) },
-            ),
-            SettingsChoice(
-                ThemeMode.LIGHT.name,
-                stringResource(Res.string.theme_mode_light),
-                preview = { ThemeModePreview(ThemeMode.LIGHT) },
-            ),
-            SettingsChoice(
                 ThemeMode.DARK.name,
                 stringResource(Res.string.theme_mode_dark),
                 preview = { ThemeModePreview(ThemeMode.DARK) },
@@ -67,7 +57,7 @@ internal fun SettingsUiRegistryBuilder.registerAppearanceSettings(host: SharedSe
                 preview = { ThemeModePreview(ThemeMode.PURE_BLACK) },
             ),
         )
-    val selectedThemeMode = settings.themeMode
+    val selectedThemeMode = if (settings.themeMode in listOf(ThemeMode.DARK, ThemeMode.PURE_BLACK)) settings.themeMode else ThemeMode.DARK
     val paletteChoices =
         listOf(
             SettingsChoice(ThemePaletteStyle.TONAL_SPOT.name, stringResource(Res.string.theme_palette_tonal_spot)),

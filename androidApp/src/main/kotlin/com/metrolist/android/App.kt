@@ -303,7 +303,11 @@ class App :
         EqualizerProfiles.ensureDefaultProfile()
         try {
             if (com.auri.music.data.AuriNativeEngine.isAvailable) {
-                Timber.tag(TAG).i("AURI native engine loaded: %s", com.auri.music.data.AuriNativeEngine.getVersion())
+                Timber.tag(TAG).i(
+                    "AURI native engine loaded: %s",
+                    com.auri.music.data.AuriNativeEngine
+                        .getVersion(),
+                )
             }
         } catch (t: Throwable) {
             Timber.tag(TAG).w(t, "Could not initialize AURI native engine")

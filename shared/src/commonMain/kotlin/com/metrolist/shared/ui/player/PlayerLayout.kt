@@ -624,7 +624,6 @@ internal fun TabletPlayerContent(
 @Composable
 private fun Modifier.landscapePlayerInsets(): Modifier = windowInsetsPadding(WindowInsets.safeDrawing)
 
-
 @Composable
 private fun LandscapePlayerCollapseButton(
     buttonSize: Dp,
@@ -648,7 +647,6 @@ private fun LandscapePlayerCollapseButton(
         )
     }
 }
-
 
 private val LandscapeRightPaneStartGap = 24.dp
 private val LandscapeRightPaneEndGap = 32.dp
@@ -947,7 +945,6 @@ internal fun LandscapePlayerContent(
                 }
             }
         }
-
 
         Row(
             modifier =

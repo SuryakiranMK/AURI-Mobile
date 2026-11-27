@@ -15,8 +15,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -48,6 +50,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -122,6 +125,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
@@ -133,6 +137,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -165,6 +170,7 @@ import com.metrolist.android.LocalPlayerExpandedOrExpanding
 import com.metrolist.android.LocalPlaylistAdder
 import com.metrolist.android.LocalStartupPresentation
 import com.metrolist.android.MainActivity
+import com.metrolist.android.R
 import com.metrolist.android.deviceconnect.AndroidDeviceConnect
 import com.metrolist.android.extensions.findActivity
 import com.metrolist.android.listentogether.AndroidListenTogetherManager
@@ -233,7 +239,6 @@ import com.metrolist.android.ui.screens.settings.StorageSettingsScreen
 import com.metrolist.android.ui.screens.settings.UpdateDetailsScreen
 import com.metrolist.android.ui.screens.settings.UpdatesScreen
 import com.metrolist.android.ui.theme.MetrolistTheme
-import com.metrolist.shared.ui.theme.CosmicPureBlack
 import com.metrolist.android.ui.utils.appBarScrollBehavior
 import com.metrolist.android.ui.utils.resetHeightOffset
 import com.metrolist.android.update.AppUpdateManager
@@ -368,6 +373,7 @@ import com.metrolist.shared.ui.screens.SupportPrompt
 import com.metrolist.shared.ui.screens.pageKey
 import com.metrolist.shared.ui.screens.toHomeSection
 import com.metrolist.shared.ui.settings.SettingsPageId
+import com.metrolist.shared.ui.theme.CosmicPureBlack
 import com.metrolist.shared.ui.theme.resolveThemeSeedColor
 import com.metrolist.shared.ui.tv.tvFocusHighlight
 import com.metrolist.shared.ui.utils.LocalMouseScrollFactors
@@ -1512,27 +1518,50 @@ fun MetrolistApp(
                                         topBar = {
                                             if (shouldShowTopBar) {
                                                 val topBarTitle: @Composable () -> Unit = {
-                                                    AppTitleWithUpdateWarning(
-                                                        title =
-                                                            when (navigationState.topLevelRoute) {
-                                                                Screen.Home -> {
-                                                                    stringResource(Res.string.home)
-                                                                }
+                                                    if (navigationState.topLevelRoute == Screen.Home) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        ) {
+                                                            Image(
+                                                                painter = painterResource(id = R.drawable.ic_auri_brand),
+                                                                contentDescription = "AURI",
+                                                                modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)),
+                                                            )
+                                                            Text(
+                                                                text = "AURI",
+                                                                color = Color.White,
+                                                                fontSize = 22.sp,
+                                                                fontWeight = FontWeight.Black,
+                                                                letterSpacing = 1.sp,
+                                                            )
+                                                            Text(
+                                                                text = "MOBILE",
+                                                                color = Color(0xFFA78BFA),
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                letterSpacing = 2.sp,
+                                                            )
+                                                        }
+                                                    } else {
+                                                        AppTitleWithUpdateWarning(
+                                                            title =
+                                                                when (navigationState.topLevelRoute) {
+                                                                    Screen.Library -> {
+                                                                        stringResource(Res.string.filter_library)
+                                                                    }
 
-                                                                Screen.Library -> {
-                                                                    stringResource(Res.string.filter_library)
-                                                                }
+                                                                    Screen.EasterEgg -> {
+                                                                        stringResource(Res.string.mysterious_fourth_tab)
+                                                                    }
 
-                                                                Screen.EasterEgg -> {
-                                                                    stringResource(Res.string.mysterious_fourth_tab)
-                                                                }
-
-                                                                else -> {
-                                                                    ""
-                                                                }
-                                                            },
-                                                        showWarning = hasPendingUpdate && navigationState.topLevelRoute == Screen.Home,
-                                                    )
+                                                                    else -> {
+                                                                        ""
+                                                                    }
+                                                                },
+                                                            showWarning = false,
+                                                        )
+                                                    }
                                                 }
                                                 val topBarSubtitle: @Composable () -> Unit = {
                                                     if (navigationState.topLevelRoute == Screen.Home &&
@@ -2192,12 +2221,22 @@ private fun TopBarProfileAvatar(
                     modifier = Modifier.fillMaxSize().clip(CircleShape),
                 )
             } else {
-                Icon(
-                    MetrolistIcons.Outlined.AccountCircle,
-                    contentDescription = stringResource(Res.string.profile),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(Color(0x338B5CF6))
+                            .border(1.dp, Color(0x668B5CF6), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        MetrolistIcons.Outlined.AccountCircle,
+                        contentDescription = stringResource(Res.string.profile),
+                        tint = Color(0xFFA78BFA),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
         if (hasPendingUpdate) {

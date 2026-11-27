@@ -161,6 +161,7 @@ internal class MobilePlayerPlatform(
         onNavigateToArtist: (String) -> Unit,
         onNavigateToListenTogether: () -> Unit,
         onShowSongDetails: () -> Unit,
+        onShowSleepTimer: () -> Unit,
         extraActions: List<PlayerMenuAction>,
     ) {
         val uiState by viewModel.uiState.collectAsState()

@@ -60,8 +60,8 @@ fun HomeFrostedArtworkBlur(
                         Brush.verticalGradient(
                             colors =
                                 listOf(
-                                    CosmicElectricViolet.copy(alpha = 0.22f),
-                                    CosmicPureBlack.copy(alpha = 0.70f),
+                                    CosmicElectricViolet.copy(alpha = 0.40f),
+                                    Color(0xFF0E0B1F).copy(alpha = 0.65f),
                                     CosmicPureBlack,
                                 ),
                         ),
@@ -90,8 +90,8 @@ fun HomeFrostedArtworkBlur(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .nativeBlurCompat(radiusPx = 100f, offscreen = true)
-                            .blur(radius = 56.dp),
+                            .nativeBlurCompat(radiusPx = 80f, offscreen = true)
+                            .blur(radius = 42.dp),
                 ) {
                     AsyncImage(
                         model = request,
@@ -103,7 +103,7 @@ fun HomeFrostedArtworkBlur(
             }
         }
 
-        // Ambient tone-down overlay: tones down bright artworks so text and cards remain 100% legible
+        // Ambient tone-down overlay: soft gradient that preserves top artwork brilliance while ensuring card legibility
         Box(
             modifier =
                 Modifier
@@ -112,8 +112,9 @@ fun HomeFrostedArtworkBlur(
                         Brush.verticalGradient(
                             colorStops =
                                 arrayOf(
-                                    0.0f to CosmicPureBlack.copy(alpha = 0.40f),
-                                    0.45f to CosmicPureBlack.copy(alpha = 0.65f),
+                                    0.0f to Color.Transparent,
+                                    0.45f to CosmicPureBlack.copy(alpha = 0.40f),
+                                    0.80f to CosmicPureBlack.copy(alpha = 0.85f),
                                     1.0f to CosmicPureBlack,
                                 ),
                         ),
@@ -125,7 +126,7 @@ fun HomeFrostedArtworkBlur(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.65f)
+                    .fillMaxHeight(0.45f)
                     .align(Alignment.BottomCenter)
                     .background(artworkScrimBrush(CosmicPureBlack)),
         )

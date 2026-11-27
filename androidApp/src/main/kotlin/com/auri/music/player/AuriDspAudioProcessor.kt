@@ -14,7 +14,6 @@ import java.nio.ByteBuffer
  */
 @OptIn(UnstableApi::class)
 class AuriDspAudioProcessor : BaseAudioProcessor() {
-
     @Volatile
     private var nativeHandle: Long = 0L
 
@@ -38,7 +37,7 @@ class AuriDspAudioProcessor : BaseAudioProcessor() {
         preampDb: Float,
         autoHeadroom: Boolean,
         loudnessGainDb: Double,
-        normalizerEnabled: Boolean
+        normalizerEnabled: Boolean,
     ) {
         this.eqGains = gains.copyOf(10)
         this.preampDb = preampDb
@@ -57,7 +56,7 @@ class AuriDspAudioProcessor : BaseAudioProcessor() {
                 preampDb = preampDb,
                 autoHeadroom = autoHeadroomEnabled,
                 loudnessGainDb = loudnessGainDb,
-                normalizerEnabled = normalizerEnabled
+                normalizerEnabled = normalizerEnabled,
             )
         }
     }
@@ -75,9 +74,7 @@ class AuriDspAudioProcessor : BaseAudioProcessor() {
         return inputAudioFormat
     }
 
-    override fun isActive(): Boolean {
-        return super.isActive()
-    }
+    override fun isActive(): Boolean = super.isActive()
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         val remaining = inputBuffer.remaining()
@@ -96,6 +93,7 @@ class AuriDspAudioProcessor : BaseAudioProcessor() {
                 C.ENCODING_PCM_16BIT -> {
                     AuriNativeEngine.dspProcessPcm16(h, outputBuffer, 0, remaining, channels, sampleRate)
                 }
+
                 C.ENCODING_PCM_FLOAT -> {
                     AuriNativeEngine.dspProcessPcmFloat(h, outputBuffer, 0, remaining, channels, sampleRate)
                 }

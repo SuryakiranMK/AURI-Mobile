@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 
 <!-- Upstream InnerTune strings -->
 <!-- Do not add new features here -->
@@ -5710,4 +5710,8 @@
     <string name="lyrics_provider_lrclib">LRCLIB</string>
     <string name="lyrics_provider_lrclib_format">%1$s / Lyrics provided by %2$s</string>
     <string name="audio_output">Audio output</string>
+    <string name="menu_dismiss_queue">Dismiss queue</string>
+    <string name="menu_report">Report</string>
+    <string name="menu_export_to_device">Export to device</string>
+    <string name="menu_export_all_to_device">Export all to device</string>
 </resources>

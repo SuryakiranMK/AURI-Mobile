@@ -94,6 +94,7 @@ interface PlayerPlatform {
         onNavigateToArtist: (String) -> Unit,
         onNavigateToListenTogether: () -> Unit,
         onShowSongDetails: () -> Unit,
+        onShowSleepTimer: () -> Unit = {},
         extraActions: List<PlayerMenuAction>,
     )
 

@@ -371,4 +371,5 @@ fun searchScreenText() =
             stringResource(
                 if (Settings.shared.voiceSearchEnabled) Res.string.voice_search else Res.string.recognize_music,
             ),
+        recognizeMusicContentDescription = stringResource(Res.string.recognize_music),
     )

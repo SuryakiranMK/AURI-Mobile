@@ -1242,14 +1242,16 @@ class ExoPlaybackPlayer(
         val eq = EqualizerProfiles.configuration
         val sortedBands = eq.profile?.bands?.sortedBy { it.frequency } ?: emptyList()
         val gains = FloatArray(10) { idx -> sortedBands.getOrNull(idx)?.gain?.toFloat() ?: 0f }
-        val normGainDb = com.auri.music.data.AuriNativeEngine.calculateLoudnessGain(currentResource?.loudnessDb)
+        val normGainDb =
+            com.auri.music.data.AuriNativeEngine
+                .calculateLoudnessGain(currentResource?.loudnessDb)
         silenceSupport.values.forEach { support ->
             support.auriDsp?.configureDsp(
                 gains = gains,
                 preampDb = eq.preampDb.toFloat(),
                 autoHeadroom = true,
                 loudnessGainDb = normGainDb,
-                normalizerEnabled = Settings.shared.audioNormalization
+                normalizerEnabled = Settings.shared.audioNormalization,
             )
         }
         applyPlaybackGains()

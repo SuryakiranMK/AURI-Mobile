@@ -581,33 +581,12 @@ fun SearchScreen(
                             if (voiceSearchEnabled) {
                                 launchVoiceSearch
                             } else {
-                                { navigator.navigate(Screen.Recognition) }
+                                null
                             },
+                        onRecognitionClick = { navigator.navigate(Screen.Recognition) },
                         focusRequester = focusRequester,
                         searchBarEndPadding = searchBarEndPadding,
                         modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = !isQuerySubmitted && (isTv || showFloatingAction) && !isImeVisible,
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 },
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = maxOf(imeBottomInset, floatingActionsBottomInset.value) + 16.dp),
-            ) {
-                FloatingActionButton(
-                    onClick = { navigator.navigate(Screen.Recognition) },
-                    shape = RoundedCornerShape(12.dp),
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ) {
-                    Icon(
-                        imageVector = MetrolistIcons.Outlined.AudioCapture,
-                        contentDescription = stringResource(Res.string.recognize_music),
                     )
                 }
             }

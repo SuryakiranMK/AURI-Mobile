@@ -275,6 +275,7 @@ class AndroidPlayerPlatform(
         onNavigateToArtist: (String) -> Unit,
         onNavigateToListenTogether: () -> Unit,
         onShowSongDetails: () -> Unit,
+        onShowSleepTimer: () -> Unit,
         extraActions: List<PlayerMenuAction>,
     ) {
         val volume by playerConnection.volume.collectAsState()
@@ -293,6 +294,7 @@ class AndroidPlayerPlatform(
             onNavigateToArtist = onNavigateToArtist,
             onNavigateToListenTogether = onNavigateToListenTogether,
             onShowSongDetails = onShowSongDetails,
+            onShowSleepTimer = onShowSleepTimer,
             extraActions = extraActions,
         )
     }
