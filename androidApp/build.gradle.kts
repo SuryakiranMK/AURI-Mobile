@@ -281,7 +281,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = if (hasReleaseSigning) signingConfigs["release"] else null
+            signingConfig = if (hasReleaseSigning) signingConfigs["release"] else signingConfigs.getByName("debug")
         }
         create("benchmark") {
             initWith(getByName("release"))

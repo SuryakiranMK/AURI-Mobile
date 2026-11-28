@@ -5710,6 +5710,7 @@
     <string name="lyrics_provider_lrclib">LRCLIB</string>
     <string name="lyrics_provider_lrclib_format">%1$s / Lyrics provided by %2$s</string>
     <string name="audio_output">Audio output</string>
+    <string name="playing_from">Playing from</string>
     <string name="menu_dismiss_queue">Dismiss queue</string>
     <string name="menu_report">Report</string>
     <string name="menu_export_to_device">Export to device</string>
